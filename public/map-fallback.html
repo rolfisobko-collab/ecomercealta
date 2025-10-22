@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mapa de Sucursales</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    .store-info {
+      padding: 10px;
+      max-width: 200px;
+    }
+    .store-info h3 {
+      margin: 0 0 5px 0;
+      color: #ff3333;
+      font-weight: bold;
+    }
+    .store-info p {
+      margin: 0 0 5px 0;
+      font-size: 12px;
+    }
+    .store-hours {
+      font-size: 11px;
+      color: #666;
+    }
+    .store-phone {
+      font-size: 12px;
+      font-weight: 500;
+      color: #ff3333;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  
+  <script>
+    // Inicializar el mapa
+    function initMap() {
+      // Coordenadas de la tienda principal
+      const mainStore = { lat: -27.36714, lng: -55.89344 };
+      
+      // Crear el mapa centrado en la tienda principal
+      const map = new google.maps.Map(document.getElementById("map"), {
+        zoom: 13,
+        center: mainStore,
+      });
+      
+      // Lista de sucursales
+      const stores = [
+        {
+          position: { lat: -27.36714, lng: -55.89344 },
+          title: "Tienda Principal",
+          address: "Catamarca 1928, Posadas, Misiones",
+          phone: "+54 376 123-4567",
+          hours: "Lunes a Viernes: 9:00 - 18:00, Sábados: 9:00 - 13:00",
+          isMain: true
+        },
+        {
+          position: { lat: -27.37214, lng: -55.89744 },
+          title: "Sucursal Centro",
+          address: "Bolívar 2145, Posadas, Misiones",
+          phone: "+54 376 765-4321",
+          hours: "Lunes a Viernes: 9:00 - 18:00",
+          isMain: false
+        },
+        {
+          position: { lat: -27.38714, lng: -55.91344 },
+          title: "Sucursal Shopping",
+          address: "Av. Quaranta 3500, Posadas, Misiones",
+          phone: "+54 376 555-1234",
+          hours: "Todos los días: 10:00 - 22:00",
+          isMain: false
+        }
+      ];
+      
+      // Crear marcadores para cada sucursal
+      stores.forEach((store) => {
+        // Crear contenido para la ventana de información
+        const contentString = `
+          <div class="store-info">
+            <h3>${store.title}</h3>
+            <p>${store.address}</p>
+            <p class="store-hours">${store.hours}</p>
+            <p class="store-phone">${store.phone}</p>
+          </div>
+        `;
+        
+        // Crear ventana de información
+        const infowindow = new google.maps.InfoWindow({
+          content: contentString,
+        });
+        
+        // Crear marcador
+        const marker = new google.maps.Marker({
+          position: store.position,
+          map,
+          title: store.title,
+          icon: store.isMain ? {
+            url: "/images/logo-blanco-color.png",
+            scaledSize: new google.maps.Size(40, 40),
+            origin: new google.maps.Point(0, 0),
+            anchor: new google.maps.Point(20, 20)
+          } : undefined
+        });
+        
+        // Añadir evento de clic al marcador
+        marker.addListener("click", () => {
+          infowindow.open({
+            anchor: marker,
+            map,
+            shouldFocus: false,
+          });
+        });
+      });
+    }
+  </script>
+  
+  <script src="https://maps.googleapis.com/maps/api/js?key=NUEVO_ACCESS_TOKEN&callback=initMap&v=weekly" defer></script>
+</body>
+</html>

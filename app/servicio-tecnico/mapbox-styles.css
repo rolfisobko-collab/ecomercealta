@@ -1,0 +1,74 @@
+/* Enhanced Mapbox styles for better responsive behavior */
+.mapboxgl-map {
+  font: 12px / 20px "Helvetica Neue", Arial, Helvetica, sans-serif;
+  overflow: hidden;
+  position: relative;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  height: 100%;
+  width: 100%;
+}
+
+.mapboxgl-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.mapboxgl-ctrl-logo {
+  display: block;
+  width: 88px;
+  height: 23px;
+  margin: 0 0 -4px -4px;
+}
+
+/* Estilos para los marcadores personalizados */
+.store-marker {
+  background-size: cover;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.user-marker {
+  width: 20px;
+  height: 20px;
+  background-color: #4285f4;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* Estilos para los popups */
+.mapboxgl-popup-content {
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.2);
+}
+
+.mapboxgl-popup-close-button {
+  font-size: 16px;
+  color: #666;
+}
+
+/* Media queries for responsive adjustments */
+@media (max-width: 640px) {
+  .mapboxgl-ctrl-top-right {
+    top: 5px;
+    right: 5px;
+  }
+
+  .store-marker {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mapboxgl-popup-content {
+    max-width: 200px;
+  }
+}
