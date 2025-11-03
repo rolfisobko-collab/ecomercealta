@@ -38,6 +38,7 @@ export function useProducts(
         const BATCH_SIZE = 100
         let skip = 0
         let totalFetched = 0
+        let firstBatchShown = false
 
         // Loop hasta traer todos o alcanzar maxItems
         while (true) {
@@ -63,6 +64,12 @@ export function useProducts(
             const merged = prev.concat(batch.filter(b => !seen.has(b.id)))
             return merged
           })
+
+          // Mostrar resultados desde el primer lote
+          if (!firstBatchShown) {
+            firstBatchShown = true
+            setLoading(false)
+          }
 
           totalFetched += batch.length
           skip += batch.length

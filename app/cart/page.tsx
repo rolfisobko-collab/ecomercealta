@@ -10,7 +10,7 @@ import { usePathname } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 import { useCurrency } from "@/context/CurrencyContext"
 import { fetchExchangeRate } from "@/utils/currencyUtils"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 
 export default function CartPage() {
   const pathname = usePathname()
@@ -19,6 +19,14 @@ export default function CartPage() {
   const { user } = useAuth()
   const { currency } = useCurrency()
   const [exchangeRate, setExchangeRate] = useState(1100)
+  const earnedPoints = useMemo(() => {
+    return items.reduce((acc, item) => {
+      const unit = typeof (item.product as any).points === 'number' && (item.product as any).points! > 0
+        ? Number((item.product as any).points)
+        : Math.max(0, Math.round(Number(item.product.price || 0) * 100))
+      return acc + unit * item.quantity
+    }, 0)
+  }, [items])
 
   // Cargar la tasa de cambio desde Firebase
   useEffect(() => {
@@ -162,6 +170,10 @@ export default function CartPage() {
                           ? `${new Intl.NumberFormat("es-AR").format(Math.round(totalPrice * exchangeRate))} ARS`
                           : `${totalPrice.toFixed(2)} USD`}
                       </p>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-sm">
+                      <p className="text-gray-500 dark:text-gray-400">Puntos a ganar</p>
+                      <p className="font-semibold">{earnedPoints.toLocaleString('es-AR')} pts</p>
                     </div>
                   </div>
                 </div>

@@ -13,6 +13,8 @@ import { FavoriteButton } from "@/components/product/FavoriteButton"
 import { categoryService } from "@/services/hybrid/categoryService"
 import ProductCard from "@/components/product/ProductCard"
 import ReactMarkdown from "react-markdown"
+import { useProductFast } from "@/hooks/useProductFast"
+import { useCatalogCache } from "@/hooks/useCatalogCache"
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [product, setProduct] = useState<Product | null>(null)
@@ -28,59 +30,104 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const { addItem } = useCart()
   const { toast } = useToast()
   const { id } = use(params)
+  const { product: fastProduct, loading: fastLoading, error: fastError } = useProductFast(id)
+  const catalog = useCatalogCache()
 
   // Scroll to top on component mount
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [])
 
+  // Adopt Dexie-first product and then enrich with category and related
   useEffect(() => {
-    const fetchProduct = async () => {
+    if (fastError && !fastProduct) setError(fastError)
+    // When fastProduct is available (from Dexie or API), set it and enrich
+    if (!fastProduct) {
+      setLoading(fastLoading)
+      return
+    }
+    setProduct(fastProduct as any)
+    setActiveImage((fastProduct as any).image1 || null)
+    setLoading(false)
+
+    // Fetch category name if present
+    ;(async () => {
       try {
-        setLoading(true)
-        const res = await fetch(`/api/products/${id}`)
-        const productData = res.ok ? ((await res.json()) as Product) : null
-        if (productData) {
-          setProduct(productData)
-          setActiveImage(productData.image1 || null)
-
-          // Obtener el nombre de la categoría
-          if (productData.category) {
-            try {
-              const category = await categoryService.getById(productData.category)
-              if (category) {
-                setCategoryName(category.name)
-              }
-            } catch (err) {
-              console.error("Error al obtener categoría:", err)
-              setCategoryName("No especificada")
-            }
-          }
-
-          // Cargar productos relacionados de forma simple
-          try {
-            const allProducts = await productService.getAll()
-            const filtered = allProducts.filter((p) => p.id !== productData.id && p.price > 0 && p.image1).slice(0, 4)
-            setRelatedProducts(filtered)
-          } catch (err) {
-            console.error("Error al cargar productos relacionados:", err)
-            setRelatedProducts([])
-          } finally {
-            setLoadingRelated(false)
-          }
+        if ((fastProduct as any).category) {
+          const category = await categoryService.getById((fastProduct as any).category)
+          if (category) setCategoryName(category.name)
+          else setCategoryName("No especificada")
         } else {
-          setError("Producto no encontrado")
+          setCategoryName("No especificada")
         }
       } catch (err) {
-        console.error("Error fetching product:", err)
-        setError("Error al cargar el producto")
-      } finally {
-        setLoading(false)
+        console.error("Error al obtener categoría:", err)
+        setCategoryName("No especificada")
       }
-    }
+    })()
 
-    fetchProduct()
-  }, [id])
+    // 1) Track recently viewed for personalization (localStorage)
+    try {
+      const curId = String((fastProduct as any).id)
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem('rv') : null
+      const recentIds: string[] = raw ? JSON.parse(raw) : []
+      const next = [curId, ...recentIds.filter((x) => x !== curId)].slice(0, 20)
+      window.localStorage.setItem('rv', JSON.stringify(next))
+    } catch {}
+
+    // 2) Instant related from IndexedDB cache with relevance scoring
+    try {
+      const fp: any = fastProduct as any
+      const curPrice = Number(fp.price || 0)
+      const curCategory = String(fp.category || '')
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem('rv') : null
+      const recentIds: string[] = raw ? JSON.parse(raw) : []
+      const recentSet = new Set(recentIds)
+      // Recent viewed categories
+      const recentCats = new Set(
+        (catalog.products as any[])
+          .filter((p) => recentSet.has(String(p.id)))
+          .map((p) => String(p.category || ''))
+      )
+
+      const scored = (catalog.products as any[])
+        .filter((p) => p.id !== fp.id && p.price > 0 && ((p as any).image1 || (Array.isArray(p.images) && p.images.length > 0)))
+        .map((p: any) => {
+          const sameCat = String(p.category || '') === curCategory ? 1 : 0
+          const priceDelta = Math.abs(Number(p.price || 0) - curPrice)
+          const priceScore = curPrice > 0 ? (priceDelta <= curPrice * 0.1 ? 1 : priceDelta <= curPrice * 0.25 ? 0.5 : 0) : 0
+          const viewedCatBoost = recentCats.has(String(p.category || '')) ? 0.5 : 0
+          const flagsBoost = (p.weeklyOffer ? 0.2 : 0) + (p.liquidation ? 0.2 : 0)
+          const created = new Date(p.createdAt || 0).getTime() || 0
+          const recencyBoost = created > 0 ? Math.min(1, (Date.now() - created) / (1000 * 60 * 60 * 24 * 30) * -0.1 + 1) * 0.3 : 0
+          const score = sameCat * 3 + priceScore * 2 + viewedCatBoost + flagsBoost + recencyBoost
+          return { p, score, created }
+        })
+        .sort((a, b) => (b.score !== a.score ? b.score - a.score : b.created - a.created))
+        .slice(0, 4)
+        .map((x) => x.p) as Product[]
+
+      if (scored.length > 0) {
+        setRelatedProducts(scored)
+        setLoadingRelated(false)
+      }
+    } catch {}
+
+    // 3) Background enrichment from API (keeps UI instant)
+    ;(async () => {
+      try {
+        const allProducts = await productService.getAll()
+        const filtered = allProducts
+          .filter((p) => p.id !== (fastProduct as any).id && p.price > 0 && (p as any).image1)
+          .slice(0, 4)
+        setRelatedProducts(filtered)
+      } catch (err) {
+        console.error("Error al cargar productos relacionados:", err)
+      } finally {
+        setLoadingRelated(false)
+      }
+    })()
+  }, [fastProduct, fastLoading, fastError])
 
   const handleAddToCart = () => {
     if (product && addItem) {
@@ -130,7 +177,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     )
   }
 
-  if (error || !product) {
+  if (error && !product) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-black p-4">
         <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 text-center">
@@ -160,7 +207,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     )
   }
 
-  const productImages = [product.image1, product.image2, product.image3, product.image4].filter(Boolean) as string[]
+  const anyP: any = product as any
+  const arrFromArray = Array.isArray(anyP?.images) ? (anyP.images as string[]) : []
+  const productImages = Array.from(
+    new Set(
+      [
+        ...(arrFromArray || []).slice(0, 5),
+        anyP?.image1,
+        anyP?.image2,
+        anyP?.image3,
+        anyP?.image4,
+        anyP?.image5,
+      ].filter(Boolean) as string[],
+    ),
+  )
 
   return (
     <div className="bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-black min-h-screen">
@@ -207,15 +267,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 <div className="absolute inset-0 bg-gradient-to-br from-gray-50/30 to-transparent dark:from-gray-800/30 z-0"></div>
                 <ProductImage
                   product={product}
-                  imageUrl={activeImage || product.image1}
+                  imageUrl={activeImage || anyP.image1}
                   className="w-full h-full object-contain p-6 z-10 relative transition-all duration-500 hover:scale-105"
                   enableZoom={true} // Activar zoom solo en la página de detalle
                 />
 
                 {/* Discount badge */}
-                {product.discount > 0 && (
+                {(anyP.discount ?? 0) > 0 && (
                   <div className="absolute top-4 left-4 bg-gradient-to-r from-red-600 to-red-500 text-white px-4 py-2 rounded-full font-medium shadow-lg z-20">
-                    {product.discount}% OFF
+                    {anyP.discount}% OFF
                   </div>
                 )}
               </div>
@@ -249,15 +309,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 </h1>
 
                 <div className="flex flex-wrap items-center gap-4 mb-6">
-                  {product.brand && (
+                  {anyP.brand && (
                     <div className="px-4 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-full text-sm font-medium">
-                      {product.brand}
+                      {anyP.brand}
                     </div>
                   )}
 
-                  {product.model && (
+                  {anyP.model && (
                     <div className="px-4 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-full text-sm font-medium">
-                      {product.model}
+                      {anyP.model}
                     </div>
                   )}
 
@@ -265,7 +325,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     {categoryName}
                   </div>
 
-                  {product.quantity > 0 ? (
+                  {(anyP.quantity ?? 0) > 0 ? (
                     <div className="flex items-center px-4 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full text-sm font-medium">
                       <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
                       En stock
@@ -280,12 +340,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
                 <div className="flex items-baseline">
                   <span className="text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
-                    {product.price} {product.currency}
+                    {product.price} {anyP.currency}
                   </span>
 
-                  {product.discount > 0 && (
+                  {(anyP.discount ?? 0) > 0 && (
                     <span className="ml-4 text-xl text-gray-500 dark:text-gray-400 line-through">
-                      {Math.round(product.price / (1 - product.discount / 100))} {product.currency}
+                      {Math.round(product.price / (1 - anyP.discount / 100))} {anyP.currency}
                     </span>
                   )}
                 </div>
@@ -327,15 +387,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <div className="flex flex-col gap-4">
                 <Button
                   className={`w-full py-8 text-lg font-medium rounded-xl shadow-xl transition-all duration-300 ${
-                    product.quantity > 0
+                    (anyP.quantity ?? 0) > 0
                       ? "bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white hover:shadow-2xl hover:shadow-red-600/20"
                       : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                  }`}
+                    }`}
                   onClick={handleAddToCart}
-                  disabled={product.quantity <= 0}
+                  disabled={(anyP.quantity ?? 0) <= 0}
                 >
                   <ShoppingCart className="mr-3 h-6 w-6" />
-                  {product.quantity > 0 ? "Añadir al carrito" : "Agotado"}
+                  {(anyP.quantity ?? 0) > 0 ? "Añadir al carrito" : "Agotado"}
                 </Button>
 
                 <div className="flex items-center justify-center gap-4">
@@ -526,10 +586,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   key={relatedProduct.id}
                   className="group transform transition-all duration-300 hover:-translate-y-1 h-full flex"
                 >
-                  <ProductCard
-                    product={relatedProduct}
-                    className="shadow-lg hover:shadow-xl border border-gray-100 dark:border-gray-700 flex-1 flex flex-col"
-                  />
+                  <div className="shadow-lg hover:shadow-xl border border-gray-100 dark:border-gray-700 flex-1 flex flex-col rounded-xl overflow-hidden">
+                    <ProductCard product={relatedProduct} />
+                  </div>
                 </div>
               ))}
             </div>

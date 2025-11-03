@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server"
 import { MongoClient } from "mongodb"
+import { getRedis } from "@/lib/redis"
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 const DEFAULT_CONFIG = {
   heroSlides: [
@@ -85,24 +89,35 @@ async function getDb() {
 export async function GET() {
   let client: MongoClient | null = null
   try {
+    // Try Redis fast path
+    const redis = getRedis()
+    let version = '1'
+    if (redis) {
+      const v = await redis.get<string>('flyers:ver')
+      version = v ? String(v) : '1'
+      const cacheKey = `flyers:cfg:v${version}`
+      const hit = await redis.get<string>(cacheKey)
+      if (hit) {
+        return new NextResponse(hit, {
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 's-maxage=60, stale-while-revalidate=600',
+            'ETag': `W/"flyers-${version}"`,
+          },
+        })
+      }
+    }
+
+    // Miss: read from Mongo and backfill Redis
     const conn = await getDb()
     client = conn.client
     const { db } = conn
     const collection = db.collection("settings")
 
     const doc = await collection.findOne({ key: "flyersConfig" })
-    if (!doc) {
-      return NextResponse.json({ ...DEFAULT_CONFIG, updatedAt: null })
-    }
+    const stored = (doc || {}) as any
+    const updatedAt = stored?.updatedAt || null
 
-    const { _id, key, updatedAt, ...stored } = doc as any
-
-    // Determinar si debemos usar imágenes personalizadas solo si fueron actualizadas hoy
-    const now = new Date()
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const customIsFresh = updatedAt ? new Date(updatedAt) >= startOfToday : false
-
-    // Merge de heroSlides con defaults (si faltan valores)
     const heroSlides = Array.isArray(stored.heroSlides) && stored.heroSlides.length
       ? stored.heroSlides.map((s: any, i: number) => ({
           imageUrl: String(s?.imageUrl || DEFAULT_CONFIG.heroSlides[i]?.imageUrl || ""),
@@ -111,25 +126,33 @@ export async function GET() {
         }))
       : DEFAULT_CONFIG.heroSlides
 
-    // Merge de promoBanner con defaults
     const promoBanner = {
       ...DEFAULT_CONFIG.promoBanner,
       ...(stored.promoBanner || {}),
     }
 
-    // Para categoryImages: usar defaults a menos que la actualización sea de hoy
-    const categoryImages = customIsFresh
-      ? { ...DEFAULT_CONFIG.categoryImages, ...(stored.categoryImages || {}) }
-      : { ...DEFAULT_CONFIG.categoryImages }
+    const categoryImages = { ...DEFAULT_CONFIG.categoryImages, ...(stored.categoryImages || {}) }
 
-    const response = {
+    const responseObj = {
       heroSlides,
       promoBanner,
       categoryImages,
-      updatedAt: updatedAt || null,
+      updatedAt,
+    }
+    const json = JSON.stringify(responseObj)
+
+    if (redis) {
+      const cacheKey = `flyers:cfg:v${version}`
+      await redis.set(cacheKey, json)
     }
 
-    return NextResponse.json(response)
+    return new NextResponse(json, {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 's-maxage=60, stale-while-revalidate=600',
+        'ETag': `W/"flyers-${version}"`,
+      },
+    })
   } catch (error) {
     console.error("/api/flyers GET error:", error)
     return NextResponse.json({ message: "Internal Server Error" }, { status: 500 })
@@ -179,7 +202,23 @@ export async function PUT(request: Request) {
 
     await collection.updateOne({ key: "flyersConfig" }, { $set: payload }, { upsert: true })
 
-    return NextResponse.json({ ok: true })
+    try {
+      const redis = getRedis()
+      if (redis) {
+        const newVer = String((Number((await redis.get('flyers:ver')) || '0')) + 1)
+        await redis.set('flyers:ver', newVer)
+        await redis.set('flyers:updatedAt', String(Date.now()))
+        const cacheKey = `flyers:cfg:v${newVer}`
+        await redis.set(cacheKey, JSON.stringify({
+          heroSlides: payload.heroSlides,
+          promoBanner: payload.promoBanner,
+          categoryImages: payload.categoryImages,
+          updatedAt: payload.updatedAt,
+        }))
+      }
+    } catch {}
+
+    return NextResponse.json({ ok: true, updatedAt: payload.updatedAt }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     console.error("/api/flyers PUT error:", error)
     return NextResponse.json({ message: "Internal Server Error" }, { status: 500 })

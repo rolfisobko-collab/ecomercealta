@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, Receipt, CheckCircle, DollarSign, Clock, Eye, Wrench, Trash2, Printer } from "lucide-react"
+import { Search, Receipt, CheckCircle, DollarSign, Clock, Eye, Wrench, Trash2, Printer, UserCheck } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import {
   collection,
@@ -21,6 +21,8 @@ import {
   addDoc,
   setDoc,
   deleteDoc,
+  getDocs,
+  increment,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { createPortal } from "react-dom"
@@ -66,6 +68,9 @@ interface Sale {
   displayCurrency?: string
   exchangeRate?: number
   displayTotal?: number
+  assignedUserId?: string
+  assignedUserEmail?: string
+  assignedPoints?: number
 }
 
 interface PaymentModalProps {
@@ -77,6 +82,100 @@ interface PaymentModalProps {
 interface SaleDetailsModalProps {
   sale: Sale
   onClose: () => void
+}
+
+interface AssignClientModalProps {
+  sale: Sale
+  onClose: () => void
+  onAssigned: (payload: { uid: string; email: string; points: number }) => void
+}
+
+const AssignClientModal = ({ sale, onClose, onAssigned }: AssignClientModalProps) => {
+  const [users, setUsers] = useState<{ uid: string; email: string; displayName?: string; points?: number }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [q, setQ] = useState("")
+  const [selected, setSelected] = useState<{ uid: string; email: string } | null>(null)
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      try {
+        const snap = await getDocs(query(collection(db, "userProfiles"), orderBy("email", "asc")))
+        const list = snap.docs.map((d) => ({ uid: d.id, email: (d.data().email || "") as string, displayName: d.data().displayName || "", points: d.data().points || 0 }))
+        setUsers(list)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const filtered = users.filter((u) => u.email.toLowerCase().includes(q.toLowerCase()))
+
+  const computePoints = () => {
+    if (!sale) return 0
+    if (sale.currency === "USD") return Math.round(sale.total)
+    if (sale.currency === "PESO" || sale.currency === "ARS") return Math.max(1, Math.round(sale.total / 1000))
+    return Math.round(sale.total)
+  }
+
+  const points = computePoints()
+
+  const modal = (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{ zIndex: 9999999 }}>
+      <Card className="w-full max-w-xl">
+        <CardHeader>
+          <CardTitle>Asignar cliente a {sale.saleNumber}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-600">Buscar por email</label>
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="usuario@correo.com" />
+          </div>
+          <div className="max-h-64 overflow-auto border rounded">
+            {loading ? (
+              <div className="p-4 text-sm text-gray-500">Cargando cuentas...</div>
+            ) : filtered.length === 0 ? (
+              <div className="p-4 text-sm text-gray-500">Sin resultados</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Correo</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Puntos</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((u) => (
+                    <TableRow key={u.uid} className={selected?.uid === u.uid ? "bg-blue-50" : ""}>
+                      <TableCell className="font-medium">{u.email}</TableCell>
+                      <TableCell>{u.displayName || "-"}</TableCell>
+                      <TableCell>{u.points || 0}</TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="outline" onClick={() => setSelected({ uid: u.uid, email: u.email })}>Elegir</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+          <div className="text-sm text-gray-700">Puntos a otorgar: <span className="font-semibold">{points}</span></div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button disabled={!selected} onClick={() => selected && onAssigned({ uid: selected.uid, email: selected.email, points })}>
+              Asignar y otorgar puntos
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  if (typeof window !== "undefined") return createPortal(modal, document.body)
+  return modal
 }
 
 const SaleDetailsModal = ({ sale, onClose }: SaleDetailsModalProps) => {
@@ -821,6 +920,7 @@ export default function CajaPage() {
   const [activeTab, setActiveTab] = useState("pending")
   const { toast } = useToast()
   const [technicalServices, setTechnicalServices] = useState<any[]>([])
+  const [assignSale, setAssignSale] = useState<Sale | null>(null)
   const [showTechnicalService, setShowTechnicalService] = useState<any>(null)
 
   useEffect(() => {
@@ -1303,6 +1403,15 @@ export default function CajaPage() {
                                 Imprimir
                               </Button>
                               <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAssignSale(sale)}
+                                className="flex items-center gap-1"
+                              >
+                                <UserCheck className="h-4 w-4" />
+                                Asignar cliente
+                              </Button>
+                              <Button
                                 variant="destructive"
                                 size="sm"
                                 onClick={() => deleteSale(sale.id, sale.saleNumber)}
@@ -1533,6 +1642,36 @@ export default function CajaPage() {
           sale={paymentSale}
           onClose={() => setPaymentSale(null)}
           onConfirm={(paymentDetails) => processPayment(paymentSale.id, paymentDetails)}
+        />
+      )}
+
+      {/* Assign Client Modal */}
+      {assignSale && (
+        <AssignClientModal
+          sale={assignSale}
+          onClose={() => setAssignSale(null)}
+          onAssigned={async ({ uid, email, points }) => {
+            try {
+              // Guardar marca en la venta
+              await updateDoc(doc(db, "sales", assignSale.id), {
+                assignedUserId: uid,
+                assignedUserEmail: email,
+                assignedPoints: points,
+                updatedAt: serverTimestamp(),
+              })
+              // Otorgar puntos al usuario
+              await updateDoc(doc(db, "userProfiles", uid), {
+                points: increment(points),
+                updatedAt: serverTimestamp(),
+              })
+              toast({ title: "Asignado", description: `Asignado a ${email}. Puntos otorgados: ${points}` })
+            } catch (e) {
+              console.error("assign error", e)
+              toast({ title: "Error", description: "No se pudo asignar la venta", variant: "destructive" })
+            } finally {
+              setAssignSale(null)
+            }
+          }}
         />
       )}
     </div>

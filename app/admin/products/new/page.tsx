@@ -80,6 +80,8 @@ export default function ProductPage() {
   const [promoPrice, setPromoPrice] = useState("")
   const [cost, setCost] = useState("")
   const [quantity, setQuantity] = useState("")
+  const [points, setPoints] = useState("")
+  const [autoPoints, setAutoPoints] = useState(true)
   const [category, setCategory] = useState("")
   const [location, setLocation] = useState("")
   const [obs, setObs] = useState("")
@@ -127,13 +129,22 @@ export default function ProductPage() {
     }
   }, [isEditMode, productId])
 
-  // Cargar imágenes desde localStorage
+  // Auto-cálculo de puntos al cambiar precio cuando está en modo automático
   useEffect(() => {
-    const img1 = localStorage.getItem("productImage1") || ""
-    const img2 = localStorage.getItem("productImage2") || ""
-    const img3 = localStorage.getItem("productImage3") || ""
-    const img4 = localStorage.getItem("productImage4") || ""
-    const img5 = localStorage.getItem("productImage5") || ""
+    if (!autoPoints) return
+    const p = Number(price) || 0
+    const calc = Math.max(0, Math.round(p * 100))
+    setPoints(String(calc))
+  }, [price, autoPoints])
+
+  // Cargar imágenes desde localStorage (claves por producto)
+  useEffect(() => {
+    const keyId = productId || 'new'
+    const img1 = localStorage.getItem(`productImage1_${keyId}`) || ""
+    const img2 = localStorage.getItem(`productImage2_${keyId}`) || ""
+    const img3 = localStorage.getItem(`productImage3_${keyId}`) || ""
+    const img4 = localStorage.getItem(`productImage4_${keyId}`) || ""
+    const img5 = localStorage.getItem(`productImage5_${keyId}`) || ""
 
     setImage1(img1)
     setImage2(img2)
@@ -145,7 +156,7 @@ export default function ProductPage() {
     if (validUrls.length > 0) {
       setImageUrls(validUrls)
     }
-  }, [])
+  }, [productId])
 
   // Cargar datos del producto
   const loadProductData = async (id) => {
@@ -161,6 +172,17 @@ export default function ProductPage() {
         setPrice(product.price.toString())
         setPromoPrice(product.promoPrice ? product.promoPrice.toString() : "")
         setCost(product.cost.toString())
+        // Inicializar puntos
+        const initialPoints = (product as any)?.points
+        if (initialPoints !== undefined && initialPoints !== null) {
+          setPoints(String(initialPoints))
+          setAutoPoints(false)
+        } else {
+          const p = Number(product.price) || 0
+          const calc = Math.max(0, Math.round(p * 100))
+          setPoints(String(calc))
+          setAutoPoints(true)
+        }
         setQuantity(product.quantity.toString())
         setCategory(product.category)
         setLocation(product.location)
@@ -500,6 +522,7 @@ export default function ProductPage() {
         price: isNaN(Number(price)) ? 0 : Number(price),
         promoPrice: promoPrice && !isNaN(Number(promoPrice)) ? Number(promoPrice) : null,
         cost: isNaN(Number(cost)) ? 0 : Number(cost),
+        points: isNaN(Number(points)) ? 0 : Number(points),
         currency: "USD",
         quantity: isNaN(Number(quantity)) ? 0 : Number(quantity),
         category: category ?? "",
@@ -540,11 +563,14 @@ export default function ProductPage() {
         description: `El producto "${name}" ha sido ${isEditMode ? "actualizado" : "creado"} correctamente con ${imagesArray.length} imágenes.`,
       })
 
-      // Limpiar localStorage solo después de guardar exitosamente
-      localStorage.removeItem("productImages")
-      for (let i = 1; i <= 5; i++) {
-        localStorage.removeItem(`productImage${i}`)
-      }
+      // Limpiar localStorage solo después de guardar exitosamente (claves por producto)
+      try {
+        const keyId = finalProductId || 'new'
+        localStorage.removeItem(`productImages_${keyId}`)
+        for (let i = 1; i <= 5; i++) {
+          localStorage.removeItem(`productImage${i}_${keyId}`)
+        }
+      } catch {}
 
       router.push("/admin/products")
     } catch (error) {
@@ -723,6 +749,28 @@ export default function ProductPage() {
                       rows={4}
                     />
                     {errors.description && <p className="text-red-500 text-sm">{errors.description}</p>}
+                  </div>
+
+                  {/* Puntos del producto */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="points">Puntos</Label>
+                      <Input
+                        id="points"
+                        value={points}
+                        onChange={(e) => setPoints(e.target.value.replace(/[^0-9]/g, ""))}
+                        disabled={autoPoints}
+                      />
+                      <p className="text-xs text-gray-500">Cantidad de puntos que otorga este producto.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Modo</Label>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" variant={autoPoints ? "default" : "outline"} onClick={() => setAutoPoints(true)} size="sm">Automático</Button>
+                        <Button type="button" variant={!autoPoints ? "default" : "outline"} onClick={() => setAutoPoints(false)} size="sm">Manual</Button>
+                      </div>
+                      <p className="text-xs text-gray-500">Automático = precio × 100</p>
+                    </div>
                   </div>
 
                   <div className="space-y-2 pt-4 border-t">

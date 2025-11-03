@@ -12,6 +12,7 @@ import { formatCurrency } from "@/utils/currencyUtils"
 import { fetchExchangeRate } from "@/utils/currencyUtils"
 import { cn } from "@/lib/utils"
 import { useCurrency } from "@/context/CurrencyContext"
+import { useCatalogCache } from "@/hooks/useCatalogCache"
 
 export default function LatestProducts() {
   const [products, setProducts] = useState<Product[]>([])
@@ -23,46 +24,19 @@ export default function LatestProducts() {
   const totalPages = Math.ceil(products.length / productsPerPage)
   const { currency } = useCurrency()
   const [exchangeRate, setExchangeRate] = useState(1100) // Valor inicial
+  const catalog = useCatalogCache()
 
   useEffect(() => {
-    async function loadLatestProducts() {
-      try {
-        setLoading(true)
-        // Obtener todos los productos
-        const allProducts = await productService.getAll()
-
-        // Ordenar por fecha de creación (más recientes primero)
-        const sortedProducts = allProducts.sort((a, b) => {
-          const dateA = new Date(a.createdAt || 0).getTime()
-          const dateB = new Date(b.createdAt || 0).getTime()
-          return dateB - dateA
-        })
-
-        // Filtrar productos con imágenes y precio
-        const filteredProducts = sortedProducts.filter((product) => {
-          const hasPrice = product.price && product.price > 0
-          const hasImages =
-            (product.images && Array.isArray(product.images) && product.images.length > 0) ||
-            product.image1 ||
-            product.image2 ||
-            product.image3 ||
-            product.image4 ||
-            product.image5
-
-          return hasPrice && hasImages
-        })
-
-        // Tomar los primeros 12 productos como máximo
-        setProducts(filteredProducts.slice(0, 12))
-      } catch (error) {
-        console.error("Error al cargar los últimos productos:", error)
-      } finally {
-        setLoading(false)
-      }
+    // Instantáneo desde IndexedDB
+    if (!catalog.loading) {
+      const base = (catalog.products as any[])
+        .filter((p) => p.price && p.price > 0 && (p.image1 || (Array.isArray(p.images) && p.images.length > 0)))
+        .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+        .slice(0, 12) as Product[]
+      setProducts(base)
+      setLoading(false)
     }
-
-    loadLatestProducts()
-  }, [])
+  }, [catalog.loading, catalog.products])
 
   // Cargar la tasa de cambio desde Firebase
   useEffect(() => {

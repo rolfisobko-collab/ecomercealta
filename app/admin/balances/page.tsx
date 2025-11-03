@@ -15,6 +15,7 @@ import { IncomeModal } from "@/components/balances/IncomeModal"
 import { cashRegisterService } from "@/services/api/cashRegisterService"
 import type { Transaction } from "@/models/CashRegister"
 import type { Currency } from "@/models/Currency"
+import { AdminPasswordProtection } from "@/components/admin/AdminPasswordProtection"
 
 interface DailyBreakdown {
   income: number
@@ -143,6 +144,7 @@ export default function BalancesPage() {
   }
 
   return (
+    <AdminPasswordProtection>
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <div className="container mx-auto p-6 space-y-8">
         {/* Header Section */}
@@ -236,5 +238,6 @@ export default function BalancesPage() {
         />
       </div>
     </div>
+    </AdminPasswordProtection>
   )
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import Link from "next/link"
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
@@ -86,7 +87,8 @@ export default function SearchPageContent() {
 
   const [query, setQuery] = useState(initialQuery)
   const [selectedCategory, setSelectedCategory] = useState(initialCategory)
-  const [priceRange, setPriceRange] = useState([0, 1000])
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000])
+  const [maxPrice, setMaxPrice] = useState<number>(100000)
   const [availability, setAvailability] = useState<string[]>([])
   const [sortBy, setSortBy] = useState("relevance")
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
@@ -111,6 +113,23 @@ export default function SearchPageContent() {
   }, [])
 
   const { products, loading: productsLoading } = useProducts(selectedCategory, query, includeTags)
+
+  // Update max price and normalize priceRange when products change
+  useEffect(() => {
+    if (Array.isArray(products) && products.length > 0) {
+      const max = products.reduce((m, p: any) => Math.max(m, Number((p as any)?.price || 0)), 0)
+      const safeMax = Math.max(100, Math.ceil(max))
+      setMaxPrice(safeMax)
+      setPriceRange(([min, curMax]) => {
+        const nextMin = Math.max(0, Math.min(min, safeMax))
+        const nextMax = Math.min(safeMax, Math.max(nextMin, curMax))
+        return [nextMin, nextMax] as [number, number]
+      })
+    } else {
+      setMaxPrice(100000)
+      setPriceRange([0, 100000])
+    }
+  }, [products])
   const { categories, loading: categoriesLoading } = useCategories()
   const { addItem } = useCart()
 
@@ -134,11 +153,16 @@ export default function SearchPageContent() {
 
   // Filtrar productos según los filtros aplicados
   const filteredProducts = products.filter((product) => {
-    // Verificar que el producto tenga imagen
-    const hasImage = product.imageUrl || (product.images && product.images.length > 0)
+    // Verificar que el producto tenga imagen (compat: image1..image5)
+    const anyP: any = product as any
+    const hasImage =
+      Boolean(product.imageUrl) ||
+      (Array.isArray(product.images) && product.images.length > 0) ||
+      Boolean(anyP?.image1 || anyP?.image2 || anyP?.image3 || anyP?.image4 || anyP?.image5)
 
     // Verificar que el producto tenga precio y sea mayor que 0
-    const hasPrice = product.price && product.price > 0
+    const priceNum = Number(product.price || 0)
+    const hasPrice = priceNum > 0
 
     // Si no tiene imagen o precio, no mostrar el producto
     if (!hasImage || !hasPrice) {
@@ -146,7 +170,8 @@ export default function SearchPageContent() {
     }
 
     // Filtro de precio
-    if (product.price < priceRange[0] || product.price > priceRange[1]) {
+    const pnum = Number(product.price || 0)
+    if (pnum < priceRange[0] || pnum > priceRange[1]) {
       return false
     }
 
@@ -469,11 +494,10 @@ export default function SearchPageContent() {
                   <h3 className="font-medium mb-2">Precio</h3>
                   <div className="px-2">
                     <Slider
-                      defaultValue={[0, 1000]}
-                      max={1000}
+                      max={maxPrice}
                       step={10}
                       value={priceRange}
-                      onValueChange={setPriceRange}
+                      onValueChange={(val) => setPriceRange([val[0], val[1]] as [number, number])}
                       className="mb-6"
                     />
                     <div className="flex items-center justify-between">
@@ -584,11 +608,10 @@ export default function SearchPageContent() {
                 <AccordionContent>
                   <div className="px-2">
                     <Slider
-                      defaultValue={[0, 1000]}
-                      max={1000}
+                      max={maxPrice}
                       step={10}
                       value={priceRange}
-                      onValueChange={setPriceRange}
+                      onValueChange={(val) => setPriceRange([val[0], val[1]] as [number, number])}
                       className="mb-6"
                     />
                     <div className="flex items-center justify-between">
@@ -742,22 +765,32 @@ export default function SearchPageContent() {
                                 </div>
                                 <div className="flex-1 py-2 px-3 flex flex-col justify-center">
                                   <h3 className="font-medium text-base mb-3 line-clamp-1">{product.name}</h3>
-                                  <div className="flex items-center justify-between">
+                                  <div className="flex items-center justify-between gap-2">
                                     <span className="font-bold text-red-600 dark:text-red-400">
                                       ${product.price} {product.currency}
                                     </span>
-                                    <Button
-                                      size="sm"
-                                      className="bg-red-600 hover:bg-red-700 opacity-90 group-hover:opacity-100 transition-opacity"
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        addItem(product)
-                                      }}
-                                    >
-                                      <ShoppingCart className="h-3.5 w-3.5 mr-1" />
-                                      Añadir
-                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        asChild
+                                        className="dark:border-red-600"
+                                      >
+                                        <Link href={`/products/${product.id}`}>Ver detalles</Link>
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        className="bg-red-600 hover:bg-red-700 opacity-90 group-hover:opacity-100 transition-opacity"
+                                        onClick={(e) => {
+                                          e.preventDefault()
+                                          e.stopPropagation()
+                                          addItem(product)
+                                        }}
+                                      >
+                                        <ShoppingCart className="h-3.5 w-3.5 mr-1" />
+                                        Añadir
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>

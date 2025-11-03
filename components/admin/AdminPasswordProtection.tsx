@@ -1,11 +1,13 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState } from "react"
 import { Lock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-const ADMIN_PASSWORD = "charly1234*"
+// Nota: En el cliente no podemos leer envs del servidor.
+// Si hace falta configurar por env, usar NEXT_PUBLIC_ADMIN_PASS.
+const ADMIN_PASSWORD = (process.env.NEXT_PUBLIC_ADMIN_PASS as string) || "Facu154164"
 
 export function AdminPasswordProtection({ children }: { children: React.ReactNode }) {
   const [password, setPassword] = useState("")
@@ -14,7 +16,6 @@ export function AdminPasswordProtection({ children }: { children: React.ReactNod
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (password === ADMIN_PASSWORD) {
       setIsUnlocked(true)
       setError("")
@@ -30,13 +31,11 @@ export function AdminPasswordProtection({ children }: { children: React.ReactNod
 
   return (
     <div className="relative min-h-screen">
-      {/* Contenido con blur */}
-      <div className="blur-lg pointer-events-none select-none">
-        {children}
-      </div>
+      {/* Fondo propio (sin mostrar contenido borroso) */}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-gray-900 via-gray-800 to-black" />
 
       {/* Modal de contraseña */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-md mx-4 border border-gray-200 dark:border-gray-700">
           <div className="flex flex-col items-center mb-6">
             <div className="bg-red-100 dark:bg-red-900/30 p-4 rounded-full mb-4">
@@ -46,7 +45,7 @@ export function AdminPasswordProtection({ children }: { children: React.ReactNod
               Área Protegida
             </h2>
             <p className="text-gray-600 dark:text-gray-400 text-center">
-              Ingresa la contraseña para acceder al panel de administración
+              Ingresa la contraseña para acceder
             </p>
           </div>
 
@@ -72,7 +71,7 @@ export function AdminPasswordProtection({ children }: { children: React.ReactNod
 
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-6 text-lg"
+              className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3 text-base"
             >
               Desbloquear
             </Button>

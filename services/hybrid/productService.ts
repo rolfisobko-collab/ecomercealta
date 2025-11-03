@@ -144,6 +144,11 @@ export async function deleteProduct(id: string): Promise<boolean> {
 
 export async function updateProduct(id: string, data: Partial<Product>): Promise<boolean> {
   const provider = getDatabaseProvider()
+  // En el navegador, siempre usar servicio API para evitar importar Mongoose
+  if (typeof window !== 'undefined') {
+    const firebaseProductService = await import("../api/productService")
+    return await firebaseProductService.updateProduct(id, data as any)
+  }
   if (provider === 'mongodb') {
     const mongodbProductService = await import("../mongodb/productService")
     return await mongodbProductService.updateProduct(id, data)

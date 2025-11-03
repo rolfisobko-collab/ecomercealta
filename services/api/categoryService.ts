@@ -44,6 +44,7 @@ export class CategoryService {
               name: data.name || "",
               description: data.description || "",
               imageUrl: data.imageUrl || "",
+              icon: data.icon || "",
               createdAt: data.createdAt || new Date().toISOString(),
               updatedAt: data.updatedAt || new Date().toISOString(),
             })
@@ -87,6 +88,7 @@ export class CategoryService {
             name: data.name || "",
             description: data.description || "",
             imageUrl: data.imageUrl || "",
+            icon: data.icon || "",
             createdAt: data.createdAt || new Date().toISOString(),
             updatedAt: data.updatedAt || new Date().toISOString(),
           })
@@ -129,6 +131,7 @@ export class CategoryService {
           name: data.name || "",
           description: data.description || "",
           imageUrl: data.imageUrl || "",
+          icon: data.icon || "",
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
         })
@@ -163,6 +166,7 @@ export class CategoryService {
         name: category.name,
         description: category.description,
         imageUrl: category.imageUrl || "",
+        icon: category.icon || "",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }
@@ -190,6 +194,7 @@ export class CategoryService {
       // Preparar datos para actualizar
       const updateData = {
         ...category,
+        icon: category.icon ?? (category as any).icon ?? "",
         updatedAt: new Date().toISOString(),
       }
 

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/context/AuthContext"
 import { useCart } from "@/context/CartContext"
@@ -56,6 +56,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { fetchExchangeRate } from "@/utils/currencyUtils"
+import { useCurrency } from "@/context/CurrencyContext"
 
 interface Address {
   id: string
@@ -84,6 +85,7 @@ export default function CheckoutPage() {
   const inGremio = pathname?.startsWith("/gremio")
   const { user } = useAuth()
   const { items, totalPrice, clearCart } = useCart()
+  const { currency } = useCurrency()
   const { toast } = useToast()
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loadingAddresses, setLoadingAddresses] = useState(true)
@@ -152,6 +154,14 @@ export default function CheckoutPage() {
   const [exchangeRate, setExchangeRate] = useState<number>(1100)
   const [validationOpen, setValidationOpen] = useState(false)
   const [validationIssues, setValidationIssues] = useState<string[]>([])
+  const earnedPoints = useMemo(() => {
+    return items.reduce((acc, item) => {
+      const unit = typeof (item.product as any).points === 'number' && (item.product as any).points! > 0
+        ? Number((item.product as any).points)
+        : Math.max(0, Math.round(Number(item.product.price || 0) * 100))
+      return acc + unit * item.quantity
+    }, 0)
+  }, [items])
 
   const paymentMethods: PaymentMethod[] = [
     {
@@ -1264,14 +1274,20 @@ export default function CheckoutPage() {
                 <Separator className="my-2" />
                 <div className="flex justify-between font-medium text-lg">
                   <p>Total</p>
-                  <p className="text-red-600 dark:text-red-400">
-                    {totalPrice.toFixed(2)} USD{" "}
-                    {totalPrice > 0 && (
-                      <span className="text-sm text-gray-500 ml-1">
-                        ({new Intl.NumberFormat("es-AR").format(Math.round(totalPrice * exchangeRate))} ARS)
-                      </span>
-                    )}
-                  </p>
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between font-medium">
+                      <p>Total</p>
+                      <p className="text-xl font-bold text-red-600">
+                        {currency === "ARS"
+                          ? `${new Intl.NumberFormat("es-AR").format(Math.round(totalPrice * exchangeRate))} ARS`
+                          : `${totalPrice.toFixed(2)} USD`}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-sm">
+                      <p className="text-gray-500 dark:text-gray-400">Puntos a ganar</p>
+                      <p className="font-semibold">{earnedPoints.toLocaleString('es-AR')} pts</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -88,6 +88,7 @@ const ROUTE_PERMISSIONS: Record<string, keyof UserPermissions> = {
   "/admin/purchases": "purchases",
   "/admin/orders": "orders",
   "/admin/users": "users",
+  "/admin/clientes": "users",
   "/admin/servicios": "servicios",
 }
 
@@ -109,20 +110,46 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         console.log("Verificando autenticación...")
 
         // Primero verificar localStorage
-        const adminData = localStorage.getItem("adminData")
-        const isAdmin = localStorage.getItem("isAdmin")
+        let adminData = localStorage.getItem("adminData")
+        let isAdmin = localStorage.getItem("isAdmin")
 
         if (!adminData || !isAdmin) {
-          console.log("No hay datos en localStorage, redirigiendo al login")
-          setIsAuthenticated(false)
-          if (!pathname.includes("/auth/admin-login")) {
-            router.push("/auth/admin-login")
+          try {
+            let response = await fetch("/api/auth/check-admin-session", { cache: 'no-store' })
+            if (response.ok) {
+              const data = await response.json()
+              localStorage.setItem("isAdmin", "true")
+              localStorage.setItem(
+                "adminData",
+                JSON.stringify({
+                  name: data.name || "Administrador",
+                  role: data.role || "admin",
+                  email: data.email || "admin@example.com",
+                  permissions: data.permissions || DEFAULT_PERMISSIONS,
+                })
+              )
+              adminData = localStorage.getItem("adminData")
+              isAdmin = localStorage.getItem("isAdmin")
+            } else {
+              console.log("No hay datos en localStorage, redirigiendo al login")
+              setIsAuthenticated(false)
+              if (!pathname.includes("/auth/admin-login")) {
+                router.push("/auth/admin-login")
+              }
+              return
+            }
+          } catch (_) {
+            console.log("No hay datos en localStorage, redirigiendo al login")
+            setIsAuthenticated(false)
+            if (!pathname.includes("/auth/admin-login")) {
+              router.push("/auth/admin-login")
+            }
+            return
           }
-          return
         }
 
         try {
-          const userData = JSON.parse(adminData)
+          const userData = JSON.parse(adminData!)
           console.log("Datos del usuario desde localStorage:", userData)
 
           setAdminName(userData.name || "Usuario")
@@ -267,7 +294,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     },
     {
       title: "Administración",
-      items: [{ name: "Usuarios", href: "/admin/users", icon: Users }],
+      items: [
+        { name: "Usuarios", href: "/admin/users", icon: Users },
+        { name: "Clientes", href: "/admin/clientes", icon: Users },
+      ],
     },
     {
       name: "Contenido",

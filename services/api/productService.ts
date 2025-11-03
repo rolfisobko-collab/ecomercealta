@@ -25,8 +25,10 @@ const transformDoc = (doc: DocumentData): Product => {
     markdownDescription: data.markdownDescription || "",
     price: data.price || 0,
     cost: data.cost || 0,
+    points: typeof data.points === 'number' ? data.points : Math.max(0, Math.round((Number(data.price||0)) * 100)),
+    redeemPoints: typeof data.redeemPoints === 'number' ? data.redeemPoints : 0,
     currency: data.currency || "USD",
-    quantity: data.quantity || 0,
+    quantity: (typeof data.quantity === 'number' ? data.quantity : (typeof data.stock === 'number' ? data.stock : 0)),
     category: data.category || "",
     location: data.location || "",
     obs: data.obs || "",
@@ -41,10 +43,11 @@ const transformDoc = (doc: DocumentData): Product => {
     image5: data.image5 || "",
     youtubeVideoId: data.youtubeVideoId || null,
     youtubeUrl: data.youtubeUrl || "",
-    isInStock: data.quantity > 0,
+    isInStock: (typeof data.quantity === 'number' ? data.quantity : (typeof data.stock === 'number' ? data.stock : 0)) > 0,
     brand: data.brand || "",
     model: data.model || "",
     discount: data.discount || 0,
+    isReward: Boolean(data.isReward || false),
   }
 }
 
@@ -250,8 +253,35 @@ class ProductService {
         lastManualUpdate: new Date().toISOString(), // Añadir timestamp de modificación manual
         updatedAt: serverTimestamp(),
       }
-      await updateDoc(docRef, dataToUpdate)
+      // Upsert seguro: crea el doc si no existe
+      await setDoc(docRef, dataToUpdate, { merge: true })
       console.log("✅ PRODUCTO ACTUALIZADO EXITOSAMENTE")
+
+      // Best-effort mirror to Mongo API so SSR and /api/products reflect changes (incluye imágenes y flags)
+      try {
+        const payload: any = { id, ...data }
+        // Ensure minimal fields commonly used by server renderers
+        if (typeof (data as any)?.price === 'number') payload.price = (data as any).price
+        if ((data as any)?.name) payload.name = (data as any).name
+        if (Array.isArray((data as any)?.images)) payload.images = (data as any).images
+        if ((data as any)?.image1 !== undefined) payload.image1 = (data as any).image1
+        if ((data as any)?.image2 !== undefined) payload.image2 = (data as any).image2
+        if ((data as any)?.image3 !== undefined) payload.image3 = (data as any).image3
+        if ((data as any)?.image4 !== undefined) payload.image4 = (data as any).image4
+        if ((data as any)?.image5 !== undefined) payload.image5 = (data as any).image5
+        if ((data as any)?.category) payload.category = (data as any).category
+        if ((data as any)?.categoryId) payload.categoryId = (data as any).categoryId
+        if (typeof (data as any)?.points === 'number') payload.points = (data as any).points
+        if (typeof (data as any)?.redeemPoints === 'number') payload.redeemPoints = (data as any).redeemPoints
+        if ((data as any)?.isReward !== undefined) payload.isReward = Boolean((data as any).isReward)
+        if ((data as any)?.liquidation !== undefined) payload.liquidation = Boolean((data as any).liquidation)
+        if ((data as any)?.weeklyOffer !== undefined) payload.weeklyOffer = Boolean((data as any).weeklyOffer)
+        await fetch('/api/products', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }).catch(() => {})
+      } catch {}
       return true
     } catch (error) {
       console.error("❌ Error al actualizar producto:", error)

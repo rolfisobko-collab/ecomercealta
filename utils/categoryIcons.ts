@@ -94,3 +94,55 @@ export const categoryIcons = {
 export function getCategoryIcon(categoryName: string) {
   return categoryIcons[categoryName as keyof typeof categoryIcons] || Package
 }
+
+// Catálogo por clave para selección en Admin
+export const ICON_CATALOG = {
+  Battery,
+  Smartphone,
+  Camera,
+  Monitor,
+  Cpu,
+  Shield,
+  Wrench,
+  Glasses,
+  Square,
+  Tag,
+  Speaker,
+  Power,
+  Zap,
+  Volume2,
+  Wifi,
+  Vibrate,
+  Sim,
+  Server,
+  Thermometer,
+  Radio,
+  Package,
+  Volume,
+  Cable,
+  Sensor,
+  Antenna,
+  Eye,
+  Phone,
+  Headphones,
+  Tablet,
+  Button,
+  Tool,
+  Tv,
+  TouchScreen,
+  Plug,
+  Chip,
+  Home,
+  Sticker,
+  Bell,
+  Fingerprint,
+  CircuitBoard,
+  BatteryCharging,
+}
+
+export type IconKey = keyof typeof ICON_CATALOG
+
+export function getIconByKey(key?: string) {
+  if (!key) return Package
+  return (ICON_CATALOG as any)[key] || Package
+}

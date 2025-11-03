@@ -61,6 +61,8 @@ export default function EditProductPage() {
   const [price, setPrice] = useState("")
   const [promoPrice, setPromoPrice] = useState("") // Añadir estado para precio promocional
   const [cost, setCost] = useState("")
+  const [points, setPoints] = useState<string>("")
+  const [autoPoints, setAutoPoints] = useState<boolean>(true)
   const [quantity, setQuantity] = useState("")
   const [category, setCategory] = useState("")
   const [location, setLocation] = useState("")
@@ -101,6 +103,14 @@ export default function EditProductPage() {
       loadProductData(productId)
     }
   }, [productId])
+
+  // Auto-cálculo de puntos cuando precio cambia y el modo auto está activo
+  useEffect(() => {
+    if (!autoPoints) return
+    const priceNum = Number(price) || 0
+    const calc = Math.max(0, Math.round(priceNum * 100))
+    setPoints(String(calc))
+  }, [price, autoPoints])
 
   // Función para cargar los datos del producto
   const loadProductData = async (id: string) => {
@@ -151,6 +161,17 @@ export default function EditProductPage() {
         }
 
         setCost(product.cost.toString())
+        // Inicializar puntos: usar valor existente o calcular por defecto
+        const initialPoints = (product as any)?.points
+        if (initialPoints !== undefined && initialPoints !== null) {
+          setPoints(String(initialPoints))
+          setAutoPoints(false)
+        } else {
+          const p = Number(product.price) || 0
+          const calc = Math.max(0, Math.round(p * 100))
+          setPoints(String(calc))
+          setAutoPoints(true)
+        }
         setQuantity(product.quantity.toString())
         setCategory(product.category)
         setLocation(product.location)
@@ -309,8 +330,13 @@ export default function EditProductPage() {
 
   // Remove an image
   const removeImage = (index: number) => {
-    // Revoke the object URL to avoid memory leaks
-    URL.revokeObjectURL(imageUrls[index])
+    // Revoke the object URL to avoid memory leaks (only for blob: preview URLs)
+    try {
+      const url = imageUrls[index]
+      if (typeof url === 'string' && url.startsWith('blob:')) {
+        URL.revokeObjectURL(url)
+      }
+    } catch {}
 
     // Actualizar las imágenes de vista previa
     const newImageUrls = imageUrls.filter((_, i) => i !== index)
@@ -398,6 +424,7 @@ export default function EditProductPage() {
         price: Number(price),
         promoPrice: promoPrice ? Number(promoPrice) : null,
         cost: cost ? Number(cost) : 0,
+        points: points ? Number(points) : 0,
         currency: "USD",
         quantity: quantity ? Number(quantity) : 0,
         category,
@@ -415,20 +442,13 @@ export default function EditProductPage() {
         updatedAt: new Date(),
       }
 
-      // Guardar en MongoDB usando API
-      const response = await fetch('/api/products', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: productId,
-          ...productData,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Error HTTP: ${response.status}`)
+      // Guardar usando el servicio híbrido (Firebase/Mongo según provider)
+      const ok = await productService.updateProduct(productId, {
+        id: productId as any,
+        ...productData as any,
+      } as any)
+      if (!ok) {
+        throw new Error(`Fallo al actualizar el producto`)
       }
 
       toast({
@@ -576,6 +596,28 @@ export default function EditProductPage() {
                       onChange={(e) => setDescription(e.target.value)}
                       rows={4}
                     />
+                  </div>
+
+                  {/* Puntos del producto */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="points">Puntos</Label>
+                      <Input
+                        id="points"
+                        value={points}
+                        onChange={(e) => setPoints(e.target.value.replace(/[^0-9]/g, ""))}
+                        disabled={autoPoints}
+                      />
+                      <p className="text-xs text-gray-500">Cantidad de puntos que otorga este producto.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Modo</Label>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" variant={autoPoints ? "default" : "outline"} onClick={() => setAutoPoints(true)} size="sm">Automático</Button>
+                        <Button type="button" variant={!autoPoints ? "default" : "outline"} onClick={() => setAutoPoints(false)} size="sm">Manual</Button>
+                      </div>
+                      <p className="text-xs text-gray-500">Automático = precio × 100</p>
+                    </div>
                   </div>
 
                   {/* Añadir después del campo de descripción */}

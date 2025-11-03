@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { Package, CalendarDays, User2, Receipt, ChevronRight } from "lucide-react"
+import { useAuth } from "@/context/AuthContext"
+import { useRouter } from "next/navigation"
 
 const STATUS_PILLS = [
   { value: "", label: "Todos" },
@@ -60,23 +62,28 @@ export default function GremioOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState("")
   const [status, setStatus] = useState("")
+  const auth = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
+    if (auth.loading) return
+    if (!auth.user) {
+      router.replace('/auth/login?redirect=/gremio/orders')
+      return
+    }
     let active = true
     const load = async () => {
       try {
         setLoading(true)
-        const data = await getOrders()
+        const data = await getOrders(auth.user!.uid)
         if (active) setOrders(data)
       } finally {
         if (active) setLoading(false)
       }
     }
     load()
-    return () => {
-      active = false
-    }
-  }, [])
+    return () => { active = false }
+  }, [auth.loading, auth.user?.uid])
 
   const filtered = useMemo(() => {
     let list = orders
@@ -152,7 +159,7 @@ export default function GremioOrdersPage() {
                 return (
                   <tr key={o.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
                     <td className="py-2 pr-4 whitespace-nowrap">
-                      <Link href={`/order-confirmation/${o.id}`} className="inline-flex items-center gap-2 text-red-600 hover:underline">
+                      <Link href={`/gremio/order-confirmation/${o.id}`} className="inline-flex items-center gap-2 text-red-600 hover:underline">
                         <Receipt className="h-4 w-4" />
                         {friendlyOrderNumber(o.id)}
                       </Link>
@@ -177,7 +184,7 @@ export default function GremioOrdersPage() {
                       <Badge variant="secondary">{o.items?.length ?? 0}</Badge>
                     </td>
                     <td className="py-2 pr-4 text-right">
-                      <Link href={`/order-confirmation/${o.id}`} className="inline-flex items-center text-xs text-gray-500 hover:text-red-600">
+                      <Link href={`/gremio/order-confirmation/${o.id}`} className="inline-flex items-center text-xs text-gray-500 hover:text-red-600">
                         Ver detalle
                         <ChevronRight className="h-3.5 w-3.5 ml-1" />
                       </Link>

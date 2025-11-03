@@ -7,6 +7,8 @@ export interface IProduct extends Document {
   markdownDescription?: string
   price: number
   cost?: number
+  points?: number
+  redeemPoints?: number
   currency: string
   quantity: number
   category: string
@@ -24,6 +26,7 @@ export interface IProduct extends Document {
   brand?: string
   model?: string
   discount?: number
+  isReward?: boolean
   lastManualUpdate?: Date
   createdAt: Date
   updatedAt: Date
@@ -51,6 +54,16 @@ const ProductSchema = new Schema<IProduct>({
   cost: {
     type: Number,
     min: 0
+  },
+  points: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  redeemPoints: {
+    type: Number,
+    min: 0,
+    default: 0
   },
   currency: {
     type: String,
@@ -113,6 +126,10 @@ const ProductSchema = new Schema<IProduct>({
     default: 0,
     min: 0,
     max: 100
+  },
+  isReward: {
+    type: Boolean,
+    default: false
   },
   lastManualUpdate: {
     type: Date

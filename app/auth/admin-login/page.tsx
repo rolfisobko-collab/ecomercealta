@@ -1,17 +1,13 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { PasswordInput } from "@/components/auth/password-input"
 import { AlertCircle } from "lucide-react"
-import { authenticateInternalUser } from "@/services/auth/internalUserService"
 
 // Permisos por defecto para usuarios que no los tengan
 const DEFAULT_PERMISSIONS = {
@@ -32,72 +28,46 @@ const DEFAULT_PERMISSIONS = {
 }
 
 export default function AdminLoginPage() {
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const params = useSearchParams()
+  const error = params.get('error') === '1'
+  const returnTo = useMemo(() => {
+    const r = params.get('returnTo')
+    // solo permitir rutas internas bajo /admin
+    return r && r.startsWith('/admin') ? r : '/admin'
+  }, [params])
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setIsLoading(true)
-
-    try {
-      console.log("Intentando autenticar usuario:", username)
-
-      // Autenticar usando el servicio de usuarios internos
-      const user = await authenticateInternalUser(username, password)
-      console.log("Usuario autenticado:", user)
-
-      if (user) {
-        // Preparar datos del usuario con permisos por defecto
-        const userData = {
-          id: user.id,
-          name: user.name || "Usuario",
-          role: user.role || "user",
-          email: user.email || "",
-          permissions: user.permissions || DEFAULT_PERMISSIONS,
-        }
-
-        console.log("Guardando datos del usuario:", userData)
-
-        // Guardar en localStorage
+  // Si ya existe una sesión válida del lado del servidor (cookie JWT),
+  // completar localStorage y redirigir automáticamente para evitar el loop.
+  useEffect(() => {
+    let cancelled = false
+    const bootstrapFromServerSession = async () => {
+      try {
+        if (error) return
+        const res = await fetch('/api/auth/check-admin-session', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled) return
         localStorage.setItem("isAdmin", "true")
-        localStorage.setItem("adminData", JSON.stringify(userData))
-
-        // Crear sesión en el servidor también
-        try {
-          const sessionResponse = await fetch("/api/auth/create-session", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(userData),
+        localStorage.setItem(
+          "adminData",
+          JSON.stringify({
+            name: data.name || "Administrador",
+            role: data.role || "admin",
+            email: data.email || "admin@example.com",
+            permissions: data.permissions || { all: true },
           })
-
-          if (sessionResponse.ok) {
-            console.log("Sesión creada en el servidor")
-          } else {
-            console.warn("No se pudo crear la sesión en el servidor, pero continuando con localStorage")
-          }
-        } catch (sessionError) {
-          console.warn("Error creando sesión en servidor:", sessionError)
-        }
-
-        console.log("Redirigiendo a /admin")
-        // Redirigir al panel de administración
-        router.push("/admin")
-      } else {
-        setError("Credenciales incorrectas. Verifica tu usuario y contraseña.")
+        )
+        router.push(returnTo)
+      } catch (_) {
+        // ignorar, el usuario puede loguearse con el formulario
       }
-    } catch (error: any) {
-      console.error("Error de autenticación:", error)
-      setError(error.message || "Error al iniciar sesión")
-    } finally {
-      setIsLoading(false)
     }
-  }
+    bootstrapFromServerSession()
+    return () => {
+      cancelled = true
+    }
+  }, [error, returnTo, router])
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
@@ -144,52 +114,34 @@ export default function AdminLoginPage() {
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>Usuario o contraseña incorrectos</AlertDescription>
             </Alert>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form action="/api/auth/admin-login" method="GET" className="space-y-4">
+            <input type="hidden" name="returnTo" value={returnTo} />
             <div className="space-y-2">
               <Label htmlFor="username" className="text-sm font-medium">
                 Usuario
               </Label>
-              <div className="relative">
-                <Input
-                  id="username"
-                  placeholder="Nombre de usuario o email"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  className="pl-10 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-gray-200 dark:border-gray-700 focus:border-red-500 focus:ring-red-500"
-                />
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                </div>
-              </div>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                placeholder="Ingresá el usuario"
+                required
+                className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-gray-200 dark:border-gray-700 focus:border-red-500 focus:ring-red-500"
+              />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="password" className="text-sm font-medium">
                 Contraseña
               </Label>
-              <PasswordInput
+              <Input
                 id="password"
-                placeholder="Tu contraseña"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                name="password"
+                type="password"
+                placeholder="Ingresá la clave"
                 required
                 className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-gray-200 dark:border-gray-700 focus:border-red-500 focus:ring-red-500"
               />
@@ -198,16 +150,8 @@ export default function AdminLoginPage() {
             <Button
               type="submit"
               className="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white font-medium py-2.5 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-              disabled={isLoading}
             >
-              {isLoading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Iniciando sesión...
-                </div>
-              ) : (
-                "Iniciar Sesión"
-              )}
+              Ingresar
             </Button>
           </form>
         </CardContent>

@@ -3,6 +3,7 @@ export class Category {
   name: string
   description: string
   imageUrl: string
+  icon?: string
   createdAt: string
   updatedAt: string
 
@@ -11,6 +12,7 @@ export class Category {
     this.name = data.name || ""
     this.description = data.description || ""
     this.imageUrl = data.imageUrl || ""
+    this.icon = data.icon
     this.createdAt = data.createdAt || new Date().toISOString()
     this.updatedAt = data.updatedAt || new Date().toISOString()
   }
@@ -21,6 +23,7 @@ export class Category {
       name: this.name,
       description: this.description,
       imageUrl: this.imageUrl,
+      icon: this.icon,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     }
@@ -32,6 +35,7 @@ export class Category {
       name: data.name,
       description: data.description,
       imageUrl: data.imageUrl,
+      icon: data.icon,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
     })

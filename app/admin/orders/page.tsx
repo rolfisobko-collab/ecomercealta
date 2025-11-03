@@ -25,7 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { collection, getDocs, query, orderBy, where, doc, updateDoc, Timestamp } from "firebase/firestore"
+import { collection, getDocs, query, orderBy, where, doc, updateDoc, Timestamp, getDoc, setDoc, increment } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useToast } from "@/components/ui/use-toast"
 import {
@@ -397,6 +397,34 @@ export default function AdminOrders() {
         updatedAt: Timestamp.now(),
         statusHistory: selectedOrder.statusHistory ? [...selectedOrder.statusHistory, statusUpdate] : [statusUpdate],
       })
+
+      // Acreditar puntos al pasar a 'processing' (una sola vez por pedido)
+      if (newStatus === 'processing') {
+        try {
+          const fresh = await getDoc(orderRef)
+          const data: any = fresh.data() || {}
+          if (!data.pointsCredited) {
+            const items: any[] = Array.isArray(data.items) ? data.items : []
+            const earned = items.reduce((acc, it) => {
+              const unit = Math.max(0, Math.round(Number(it.price || 0) * 100))
+              return acc + unit * Number(it.quantity || 1)
+            }, 0)
+            const userId: string = data.userId || selectedOrder.userId
+            if (userId && earned > 0) {
+              const profileRef = doc(db, 'userProfiles', userId)
+              const profileSnap = await getDoc(profileRef)
+              if (profileSnap.exists()) {
+                await updateDoc(profileRef, { points: increment(earned), updatedAt: Timestamp.now() })
+              } else {
+                await setDoc(profileRef, { points: earned, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }, { merge: true })
+              }
+              await updateDoc(orderRef, { pointsCredited: true, creditedPoints: earned })
+            }
+          }
+        } catch (e) {
+          console.error('Error al acreditar puntos:', e)
+        }
+      }
 
       // Actualizar la lista de pedidos
       setOrders(orders.map((order) => (order.id === selectedOrder.id ? { ...order, status: newStatus } : order)))

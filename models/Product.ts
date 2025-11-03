@@ -4,6 +4,7 @@ export class Product {
   description: string
   price: number
   cost?: number
+  points?: number
   stock: number
   categoryId: string
   images: string[]
@@ -19,6 +20,7 @@ export class Product {
     this.description = data.description || ""
     this.price = data.price || 0
     this.cost = data.cost || 0
+    this.points = data.points || undefined
     this.stock = data.stock || 0
     this.categoryId = data.categoryId || ""
     this.images = data.images || []
@@ -40,6 +42,7 @@ export class Product {
       description: this.description,
       price: this.price,
       cost: this.cost,
+      points: this.points,
       stock: this.stock,
       categoryId: this.categoryId,
       images: this.images,
@@ -58,6 +61,7 @@ export class Product {
       description: data.description,
       price: data.price,
       cost: data.cost || 0,
+      points: data.points,
       stock: data.stock || 0,
       categoryId: data.categoryId || "",
       images: data.images || [],

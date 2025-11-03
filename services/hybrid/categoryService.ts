@@ -3,14 +3,13 @@ import type { Category } from "@/models/Category"
 
 // Servicio híbrido que usa API routes (MongoDB) en el navegador o servidor
 export async function getAllCategories(): Promise<Category[]> {
-  // En el navegador, siempre usar API routes para evitar importar Mongoose
+  // En el navegador, usar servicio API (Firebase) para tener consistencia con los cambios en admin
   if (typeof window !== 'undefined') {
     try {
-      const response = await fetch('/api/categories')
-      if (!response.ok) return []
-      return await response.json()
+      const api = await import("../api/categoryService")
+      return await api.getAllCategories()
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      console.error('Error fetching categories (client/API):', error)
       return []
     }
   }
@@ -26,15 +25,13 @@ export async function getAllCategories(): Promise<Category[]> {
 }
 
 export async function getCategoryById(id: string): Promise<Category | null> {
-  // En el navegador, evitar importar servicios Mongo; resolver vía API
+  // En el navegador, usar servicio API (Firebase) directo
   if (typeof window !== 'undefined') {
     try {
-      const response = await fetch('/api/categories')
-      if (!response.ok) return null
-      const list: Category[] = await response.json()
-      return list.find(c => c.id === id) || null
+      const api = await import("../api/categoryService")
+      return await api.categoryService.getById(id)
     } catch (error) {
-      console.error('Error fetching category by id:', error)
+      console.error('Error fetching category by id (client/API):', error)
       return null
     }
   }
@@ -50,6 +47,11 @@ export async function getCategoryById(id: string): Promise<Category | null> {
 }
 
 export async function createCategory(category: Category): Promise<Category> {
+  // En el navegador, usar servicio API para evitar importar Mongoose
+  if (typeof window !== 'undefined') {
+    const api = await import("../api/categoryService")
+    return await api.categoryService.create(category)
+  }
   const provider = getDatabaseProvider()
   if (provider === 'mongodb') {
     const mongodbCategoryService = await import("../mongodb/categoryService")
@@ -61,6 +63,11 @@ export async function createCategory(category: Category): Promise<Category> {
 }
 
 export async function updateCategory(id: string, category: Partial<Category>): Promise<Category> {
+  // En el navegador, usar servicio API para evitar importar Mongoose
+  if (typeof window !== 'undefined') {
+    const api = await import("../api/categoryService")
+    return await api.categoryService.update(id, category)
+  }
   const provider = getDatabaseProvider()
   if (provider === 'mongodb') {
     const mongodbCategoryService = await import("../mongodb/categoryService")
@@ -72,6 +79,11 @@ export async function updateCategory(id: string, category: Partial<Category>): P
 }
 
 export async function deleteCategory(id: string): Promise<void> {
+  // En el navegador, usar servicio API para evitar importar Mongoose
+  if (typeof window !== 'undefined') {
+    const api = await import("../api/categoryService")
+    return await api.categoryService.delete(id)
+  }
   const provider = getDatabaseProvider()
   if (provider === 'mongodb') {
     const mongodbCategoryService = await import("../mongodb/categoryService")
@@ -83,6 +95,11 @@ export async function deleteCategory(id: string): Promise<void> {
 }
 
 export async function searchCategories(searchTerm: string): Promise<Category[]> {
+  // En el navegador, usar servicio API para evitar importar Mongoose
+  if (typeof window !== 'undefined') {
+    const api = await import("../api/categoryService")
+    return await api.categoryService.search(searchTerm)
+  }
   const provider = getDatabaseProvider()
   if (provider === 'mongodb') {
     const mongodbCategoryService = await import("../mongodb/categoryService")

@@ -15,6 +15,7 @@ import { Category } from "@/models/Category"
 import { categoryService } from "@/services/hybrid/categoryService"
 import Link from "next/link"
 import { uploadToCloudinary } from "@/lib/cloudinary"
+import { ICON_CATALOG, getIconByKey, type IconKey } from "@/utils/categoryIcons"
 
 export default function NewCategoryPage() {
   const router = useRouter()
@@ -28,6 +29,7 @@ export default function NewCategoryPage() {
     description: "",
     imageUrl: "",
   })
+  const [iconKey, setIconKey] = useState<IconKey | "">("")
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -124,6 +126,7 @@ export default function NewCategoryPage() {
         name: formData.name,
         description: formData.description,
         imageUrl: imageUrl,
+        icon: iconKey || "",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       })
@@ -193,6 +196,27 @@ export default function NewCategoryPage() {
                 onChange={handleInputChange}
                 rows={3}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="icon">Ícono (se verá en /gremio)</Label>
+              <div className="flex items-center gap-3">
+                <select
+                  id="icon"
+                  className="flex-1 border rounded-md px-3 py-2 bg-white/50 dark:bg-gray-800/50"
+                  value={iconKey}
+                  onChange={(e) => setIconKey(e.target.value as IconKey)}
+                >
+                  <option value="">Sin ícono</option>
+                  {Object.keys(ICON_CATALOG).map((key) => (
+                    <option key={key} value={key}>{key}</option>
+                  ))}
+                </select>
+                <div className="w-10 h-10 flex items-center justify-center rounded-md bg-red-50 dark:bg-red-900/20">
+                  {(() => { const Icon = getIconByKey(iconKey); return <Icon className="h-5 w-5 text-red-600 dark:text-red-400"/> })()}
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">Elegí un ícono para representar la categoría en /gremio</p>
             </div>
 
             <div className="space-y-2">

@@ -57,7 +57,7 @@ export function SalesTab() {
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [skip, setSkip] = useState(0)
   const [hasMore, setHasMore] = useState(true)
-  const PAGE_SIZE = 100000
+  const PAGE_SIZE = 500
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "transfer">("cash")
   const [isProcessing, setIsProcessing] = useState(false)
   const [successSale, setSuccessSale] = useState<{ id: string; saleNumber: string } | null>(null)
@@ -65,6 +65,8 @@ export function SalesTab() {
 
   const [selectedCategory, setSelectedCategory] = useState("")
   const [categoriesData, setCategoriesData] = useState<Category[]>([])
+  const [sortKey, setSortKey] = useState<'name' | 'price' | 'stock'>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const { currency } = useCurrency()
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -134,9 +136,16 @@ export function SalesTab() {
         })
       }
       const loaded = list.length
-      setSkip(currentSkip + loaded)
-      // Load all at once; no further pagination
-      setHasMore(false)
+      const nextSkip = currentSkip + loaded
+      setSkip(nextSkip)
+      const nextHasMore = loaded === PAGE_SIZE
+      setHasMore(nextHasMore)
+      // Si fue un reset y aún hay más, seguir cargando progresivamente sin bloquear la UI
+      if (reset && nextHasMore) {
+        setTimeout(() => {
+          fetchProducts.current({ reset: false })
+        }, 0)
+      }
     } catch (e) {
       console.error('Error loading products:', e)
       if (!reset) setHasMore(false)
@@ -196,6 +205,50 @@ export function SalesTab() {
     }
     loadCategories()
   }, [toast])
+
+  // Instant refresh when admin/products updates a product (BroadcastChannel or localStorage event)
+  useEffect(() => {
+    let bc: BroadcastChannel | null = null
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'admin_products_last_update') {
+        fetchProducts.current({ reset: true })
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', onStorage)
+      if ('BroadcastChannel' in window) {
+        bc = new BroadcastChannel('admin-products')
+        bc.onmessage = (ev) => {
+          if (ev?.data?.type === 'product-updated') {
+            fetchProducts.current({ reset: true })
+          }
+        }
+      }
+    }
+    return () => {
+      if (typeof window !== 'undefined') window.removeEventListener('storage', onStorage)
+      if (bc) bc.close()
+    }
+  }, [])
+
+  // Keyboard navigation by first letter over categories
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!e.key || e.altKey || e.ctrlKey || e.metaKey) return
+      const letter = e.key.toLowerCase()
+      if (!/^[a-zñ]$/.test(letter)) return
+      const list = categoriesData.map(c => ({ id: String((c as any).id), name: String((c as any).name || '') }))
+      if (list.length === 0) return
+      const startsWith = list.filter(c => c.name.toLowerCase().startsWith(letter))
+      if (startsWith.length === 0) return
+      // find next from current selection
+      const currentIndex = startsWith.findIndex(c => String(c.id) === String(selectedCategory))
+      const next = startsWith[(currentIndex + 1) % startsWith.length]
+      setSelectedCategory(String(next.id))
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [categoriesData, selectedCategory])
 
   // Manejar teclas de acceso rápido para categorías
   useEffect(() => {

@@ -360,17 +360,10 @@ export default function SiteHeader() {
             </DropdownMenu>
             {!pathname?.startsWith("/gremio") && (
               <>
-                {/* Gremio quick access (mobile icon) */}
-                <Button variant="ghost" size="icon" className="sm:hidden" asChild>
+                {/* Gremio quick access (icon-only on all viewports) */}
+                <Button variant="ghost" size="icon" asChild className="rounded-full">
                   <Link href="/gremio" aria-label="Ir a Gremio">
                     <Wrench className="h-5 w-5" />
-                  </Link>
-                </Button>
-                {/* Gremio quick access (pill) */}
-                <Button asChild className="hidden sm:inline-flex rounded-full bg-gradient-to-r from-red-600 to-rose-600 text-white hover:from-red-700 hover:to-rose-700 shadow-sm">
-                  <Link href="/gremio">
-                    <Wrench className="h-4 w-4 mr-2" />
-                    Gremio
                   </Link>
                 </Button>
               </>

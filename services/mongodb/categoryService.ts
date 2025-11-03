@@ -47,6 +47,7 @@ export class CategoryService {
           name: category.name,
           description: category.description,
           imageUrl: category.imageUrl,
+          icon: (category as any).icon || undefined,
           createdAt: category.createdAt.toISOString(),
           updatedAt: category.updatedAt.toISOString(),
         }))
@@ -87,6 +88,7 @@ export class CategoryService {
           name: category.name,
           description: category.description,
           imageUrl: category.imageUrl,
+          icon: (category as any).icon || undefined,
           createdAt: category.createdAt.toISOString(),
           updatedAt: category.updatedAt.toISOString(),
         })
@@ -117,10 +119,11 @@ export class CategoryService {
       await connectToMongoDB()
 
       // Preparar datos para guardar
-      const categoryData = {
+      const categoryData: any = {
         name: category.name,
         description: category.description,
         imageUrl: category.imageUrl || "",
+        icon: (category as any).icon || null,
       }
 
       console.log("➕ Creating new category...")
@@ -129,10 +132,12 @@ export class CategoryService {
       console.log(`✅ Category created with ID: ${savedCategory._id}`)
 
       // Devolver la categoría con el ID asignado
-      return new CategoryType({
+      const created = new CategoryType({
         ...category,
         id: savedCategory._id.toString(),
       })
+      this.categoriesCache = null
+      return created
     } catch (error) {
       console.error("❌ Error creating category:", error)
       throw error
@@ -154,10 +159,17 @@ export class CategoryService {
       console.log(`✅ Category ${id} updated`)
 
       // Devolver la categoría actualizada
-      return new CategoryType({
-        ...category,
+      const updated = new CategoryType({
         id,
+        name: (category as any).name ?? '',
+        description: (category as any).description ?? '',
+        imageUrl: (category as any).imageUrl ?? '',
+        icon: (category as any).icon ?? undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       })
+      this.categoriesCache = null
+      return updated
     } catch (error) {
       console.error(`❌ Error updating category ${id}:`, error)
       throw error
@@ -170,6 +182,7 @@ export class CategoryService {
       await connectToMongoDB()
       await Category.findByIdAndDelete(id)
       console.log(`✅ Category ${id} deleted`)
+      this.categoriesCache = null
     } catch (error) {
       console.error(`❌ Error deleting category ${id}:`, error)
       throw error

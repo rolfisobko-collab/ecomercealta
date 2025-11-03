@@ -5,6 +5,7 @@ export interface ICategory extends Document {
   name: string
   description: string
   imageUrl: string
+  icon?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -23,6 +24,11 @@ const CategorySchema = new Schema<ICategory>({
   imageUrl: {
     type: String,
     required: true
+  },
+  icon: {
+    type: String,
+    required: false,
+    default: null,
   }
 }, {
   timestamps: true,

@@ -20,7 +20,7 @@ import {
   ImageIcon,
 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { getCategoryIcon } from "@/utils/categoryIcons"
+import { getCategoryIcon, getIconByKey } from "@/utils/categoryIcons"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -220,14 +220,20 @@ export default function AdminCategories() {
                       </TableRow>
                     ) : (
                       paginatedCategories.map((category) => {
-                        const IconComponent = getCategoryIcon(category.name)
+                        const iconVal = (category as any).icon as string | undefined
+                        const isUrl = !!iconVal && (iconVal.startsWith('http') || iconVal.startsWith('data:'))
+                        const IconComponent = !isUrl && iconVal ? getIconByKey(iconVal) : getCategoryIcon(category.name)
                         return (
                           <TableRow key={category.id}>
                             <TableCell className="font-mono text-xs">{category.id.substring(0, 8)}...</TableCell>
                             <TableCell>
                               <div className="flex items-center">
                                 <div className="mr-2 p-1 bg-red-50 dark:bg-red-900/20 rounded-md">
-                                  <IconComponent className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                  {isUrl ? (
+                                    <img src={iconVal!} alt={category.name} className="h-4 w-4 object-contain" />
+                                  ) : (
+                                    <IconComponent className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                  )}
                                 </div>
                                 <span className="font-medium">{category.name}</span>
                               </div>

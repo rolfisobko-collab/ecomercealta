@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { jwtVerify } from "jose"
+
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "alta-telefonia-secret-key-2024")
 
 // Definir la interfaz de permisos
 interface UserPermissions {
@@ -58,6 +60,13 @@ const routePermissions: Record<string, keyof UserPermissions> = {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Redirect root to /gremio to avoid client-side flicker
+  if (pathname === "/" || pathname === "") {
+    const to = request.nextUrl.clone()
+    to.pathname = "/gremio"
+    return NextResponse.redirect(to)
+  }
+
   // Solo aplicar middleware a rutas de admin (excepto login)
   if (!pathname.startsWith("/admin") || pathname === "/auth/admin-login") {
     return NextResponse.next()
@@ -68,11 +77,33 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Por ahora, permitir acceso a todas las rutas de admin
-  // La verificación de permisos se hace en el cliente
-  return NextResponse.next()
+  // Manejar /admin root: redirigir a sección no protegida
+  if (pathname === "/admin" || pathname === "/admin/") {
+    const to = request.nextUrl.clone()
+    to.pathname = "/admin/products"
+    return NextResponse.redirect(to)
+  }
+
+  // Verificar cookie de sesión JWT
+  const session = request.cookies.get("admin_session")
+  if (!session) {
+    const to = request.nextUrl.clone()
+    to.pathname = "/auth/admin-login"
+    to.searchParams.set("returnTo", pathname)
+    return NextResponse.redirect(to)
+  }
+
+  try {
+    await jwtVerify(session.value, JWT_SECRET)
+    return NextResponse.next()
+  } catch {
+    const to = request.nextUrl.clone()
+    to.pathname = "/auth/admin-login"
+    to.searchParams.set("returnTo", pathname)
+    return NextResponse.redirect(to)
+  }
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/", "/admin", "/admin/:path*"],
 }

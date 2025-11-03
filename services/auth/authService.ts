@@ -12,6 +12,8 @@ import {
   type UserCredential,
 } from "firebase/auth"
 import { auth } from "@/lib/firebase"
+import { db } from "@/lib/firebase"
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 
 // Types
 export interface AuthError {
@@ -74,6 +76,26 @@ export const authService = {
         await firebaseUpdateProfile(userCredential.user, {
           displayName: data.name,
         })
+
+        // Create user profile with signup bonus if not exists
+        try {
+          const profileRef = doc(db, "userProfiles", userCredential.user.uid)
+          const snap = await getDoc(profileRef)
+          if (!snap.exists()) {
+            await setDoc(profileRef, {
+              uid: userCredential.user.uid,
+              email: data.email,
+              displayName: data.name,
+              points: 500,
+              provider: 'password',
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            })
+          }
+        } catch (e) {
+          // Non-blocking: profile creation failures shouldn't fail auth
+          console.error("Failed to create user profile with bonus:", e)
+        }
       }
 
       return userCredential.user
@@ -90,6 +112,25 @@ export const authService = {
   loginWithEmail: async (email: string, password: string): Promise<User> => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      // Ensure user profile exists (older accounts)
+      try {
+        const u = userCredential.user
+        const profileRef = doc(db, "userProfiles", u.uid)
+        const snap = await getDoc(profileRef)
+        if (!snap.exists()) {
+          await setDoc(profileRef, {
+            uid: u.uid,
+            email: email,
+            displayName: u.displayName || "",
+            points: 500,
+            provider: 'password',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          })
+        }
+      } catch (e) {
+        console.error("Failed to ensure user profile (email login):", e)
+      }
       return userCredential.user
     } catch (error: any) {
       const authError: AuthError = {
@@ -104,7 +145,26 @@ export const authService = {
   loginWithGoogle: async (): Promise<UserCredential> => {
     try {
       const provider = new GoogleAuthProvider()
-      return await signInWithPopup(auth, provider)
+      const cred = await signInWithPopup(auth, provider)
+      try {
+        const u = cred.user
+        const profileRef = doc(db, "userProfiles", u.uid)
+        const snap = await getDoc(profileRef)
+        if (!snap.exists()) {
+          await setDoc(profileRef, {
+            uid: u.uid,
+            email: u.email || "",
+            displayName: u.displayName || "",
+            points: 500,
+            provider: 'google',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          })
+        }
+      } catch (e) {
+        console.error("Failed to ensure user profile (Google):", e)
+      }
+      return cred
     } catch (error: any) {
       const authError: AuthError = {
         code: error.code || "unknown",
@@ -118,7 +178,26 @@ export const authService = {
   loginWithFacebook: async (): Promise<UserCredential> => {
     try {
       const provider = new FacebookAuthProvider()
-      return await signInWithPopup(auth, provider)
+      const cred = await signInWithPopup(auth, provider)
+      try {
+        const u = cred.user
+        const profileRef = doc(db, "userProfiles", u.uid)
+        const snap = await getDoc(profileRef)
+        if (!snap.exists()) {
+          await setDoc(profileRef, {
+            uid: u.uid,
+            email: u.email || "",
+            displayName: u.displayName || "",
+            points: 500,
+            provider: 'facebook',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          })
+        }
+      } catch (e) {
+        console.error("Failed to ensure user profile (Facebook):", e)
+      }
+      return cred
     } catch (error: any) {
       const authError: AuthError = {
         code: error.code || "unknown",

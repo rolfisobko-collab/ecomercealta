@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { CategoryFilter } from "@/components/category/CategoryFilter"
-import { ProductGrid } from "@/components/product/ProductGrid"
+import ProductGridServer from "@/components/product/ProductGridServer"
 
 interface ProductsPageProps {
   searchParams: {
@@ -26,8 +26,10 @@ export default function ProductsPage({ searchParams }: ProductsPageProps) {
           <CategoryFilter />
         </div>
         <div className="w-full md:w-3/4">
+          {/* Server-rendered grid with ISR */}
+          {/* Suspense not necessary here, but kept for consistency */}
           <Suspense fallback={<div>Cargando productos...</div>}>
-            <ProductGrid categoryId={category} query={search} />
+            <ProductGridServer categoryId={category} query={search} />
           </Suspense>
         </div>
       </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { getOrder } from "@/services/api/orderService"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,11 +11,13 @@ import { Home, ShoppingBag, Check, Clock, AlertTriangle } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchExchangeRate } from "@/utils/currencyUtils"
 
-export default function OrderConfirmationPage({ params }: { params: { id: string } }) {
+export default function OrderConfirmationPage() {
   const router = useRouter()
+  const params = useParams<{ id: string }>()
   const [order, setOrder] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [exchangeRate, setExchangeRate] = useState<number>(1100)
+  const [estimatedPoints, setEstimatedPoints] = useState<number>(0)
 
   useEffect(() => {
     // Scroll al inicio de la página cuando se carga
@@ -24,16 +26,25 @@ export default function OrderConfirmationPage({ params }: { params: { id: string
     const loadOrder = async () => {
       try {
         setLoading(true)
-        const orderData = await getOrder(params.id)
+        const orderData = await getOrder(String(params.id))
         if (orderData) {
           setOrder(orderData)
+          try {
+            const pts = Array.isArray(orderData.items)
+              ? orderData.items.reduce((acc: number, it: any) => {
+                  const unit = Math.max(0, Math.round(Number(it.price || 0) * 100))
+                  return acc + unit * Number(it.quantity || 1)
+                }, 0)
+              : 0
+            setEstimatedPoints(pts)
+          } catch {}
         } else {
           // Si no se encuentra la orden, redirigir a la página principal
-          router.push("/")
+          router.push("/gremio")
         }
       } catch (error) {
         console.error("Error al cargar la orden:", error)
-        router.push("/")
+        router.push("/gremio")
       } finally {
         setLoading(false)
       }
@@ -129,7 +140,7 @@ export default function OrderConfirmationPage({ params }: { params: { id: string
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold mb-2">Orden no encontrada</h2>
           <p className="text-muted-foreground mb-6">La orden que estás buscando no existe o ha sido eliminada.</p>
-          <Button onClick={() => router.push("/")}>
+          <Button onClick={() => router.push("/gremio")}>
             <Home className="mr-2 h-4 w-4" />
             Volver al inicio
           </Button>
@@ -171,6 +182,12 @@ export default function OrderConfirmationPage({ params }: { params: { id: string
               <p className="text-sm text-muted-foreground">
                 {new Intl.NumberFormat("es-AR").format(Math.round(order.totalAmount * exchangeRate))} ARS
               </p>
+              <div className="mt-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Puntos a ganar</span>
+                  <span className="font-semibold">{estimatedPoints.toLocaleString('es-AR')} pts</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -181,7 +198,7 @@ export default function OrderConfirmationPage({ params }: { params: { id: string
               <h3 className="font-medium mb-2">Productos</h3>
               <div className="space-y-4">
                 {order.items &&
-                  order.items.map((item, index) => (
+                  order.items.map((item: any, index: number) => (
                     <div key={index} className="flex items-start justify-between">
                       <div className="flex items-start space-x-4">
                         <div className="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center overflow-hidden">
@@ -248,6 +265,9 @@ export default function OrderConfirmationPage({ params }: { params: { id: string
           <p className="text-sm text-muted-foreground text-center">
             Recibirás un correo electrónico con los detalles de tu pedido y actualizaciones sobre el estado del envío.
           </p>
+          <p className="text-xs text-center text-amber-600">
+            Los puntos se acreditarán cuando el pago esté confirmado. Podrás verlos en tu perfil del gremio.
+          </p>
         </CardFooter>
       </Card>
 
@@ -257,7 +277,7 @@ export default function OrderConfirmationPage({ params }: { params: { id: string
           Volver al inicio
         </Button>
         <Button
-          onClick={() => router.push("/profile?tab=orders")}
+          onClick={() => router.push("/gremio/orders")}
           className="bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
         >
           <ShoppingBag className="mr-2 h-4 w-4" />
