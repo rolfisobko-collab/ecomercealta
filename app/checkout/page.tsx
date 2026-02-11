@@ -28,19 +28,7 @@ import {
   Plus,
   AlertCircle,
 } from "lucide-react"
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  addDoc,
-  Timestamp,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-} from "firebase/firestore"
-import { db } from "@/lib/firebase"
+// Using MongoDB API instead of Firebase
 import { Skeleton } from "@/components/ui/skeleton"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -90,6 +78,7 @@ export default function CheckoutPage() {
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loadingAddresses, setLoadingAddresses] = useState(true)
   const [selectedAddressId, setSelectedAddressId] = useState<string>("")
+  const [pickupInStore, setPickupInStore] = useState(false)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("")
   const [transactionHash, setTransactionHash] = useState<string>("")
   const [transferDetails, setTransferDetails] = useState<string>("")
@@ -124,30 +113,138 @@ export default function CheckoutPage() {
     { id: "3", name: "Santa Fe" },
     { id: "4", name: "Mendoza" },
     { id: "5", name: "Tucumán" },
+    { id: "6", name: "Catamarca" },
+    { id: "7", name: "Chaco" },
+    { id: "8", name: "Chubut" },
+    { id: "9", name: "Corrientes" },
+    { id: "10", name: "Entre Ríos" },
+    { id: "11", name: "Formosa" },
+    { id: "12", name: "Jujuy" },
+    { id: "13", name: "La Pampa" },
+    { id: "14", name: "La Rioja" },
+    { id: "15", name: "Misiones" },
+    { id: "16", name: "Neuquén" },
+    { id: "17", name: "Río Negro" },
+    { id: "18", name: "Salta" },
+    { id: "19", name: "San Juan" },
+    { id: "20", name: "San Luis" },
+    { id: "21", name: "Santa Cruz" },
+    { id: "22", name: "Santiago del Estero" },
+    { id: "23", name: "Tierra del Fuego, Antártida e Islas del Atlántico Sur" },
+    { id: "24", name: "Ciudad Autónoma de Buenos Aires" },
   ])
   const [municipalities, setMunicipalities] = useState([
     // Buenos Aires
     { id: "101", name: "La Plata", provinceId: "1" },
     { id: "102", name: "Mar del Plata", provinceId: "1" },
     { id: "103", name: "Bahía Blanca", provinceId: "1" },
+    { id: "104", name: "Quilmes", provinceId: "1" },
+    { id: "105", name: "Lanús", provinceId: "1" },
+    { id: "106", name: "Tigre", provinceId: "1" },
+    { id: "107", name: "San Martín", provinceId: "1" },
+    { id: "108", name: "Lomas de Zamora", provinceId: "1" },
+    { id: "109", name: "Morón", provinceId: "1" },
+    { id: "110", name: "La Matanza", provinceId: "1" },
     // Córdoba
     { id: "201", name: "Córdoba Capital", provinceId: "2" },
     { id: "202", name: "Villa María", provinceId: "2" },
     { id: "203", name: "Río Cuarto", provinceId: "2" },
+    { id: "204", name: "Carlos Paz", provinceId: "2" },
+    { id: "205", name: "Alta Gracia", provinceId: "2" },
     // Santa Fe
     { id: "301", name: "Rosario", provinceId: "3" },
     { id: "302", name: "Santa Fe Capital", provinceId: "3" },
     { id: "303", name: "Venado Tuerto", provinceId: "3" },
+    { id: "304", name: "Rafaela", provinceId: "3" },
+    { id: "305", name: "San Lorenzo", provinceId: "3" },
     // Mendoza
     { id: "401", name: "Mendoza Capital", provinceId: "4" },
     { id: "402", name: "San Rafael", provinceId: "4" },
     { id: "403", name: "Godoy Cruz", provinceId: "4" },
+    { id: "404", name: "Las Heras", provinceId: "4" },
+    { id: "405", name: "Maipú", provinceId: "4" },
     // Tucumán
     { id: "501", name: "San Miguel de Tucumán", provinceId: "5" },
     { id: "502", name: "Yerba Buena", provinceId: "5" },
     { id: "503", name: "Tafí Viejo", provinceId: "5" },
+    { id: "504", name: "Concepción", provinceId: "5" },
+    // Catamarca
+    { id: "601", name: "San Fernando del Valle de Catamarca", provinceId: "6" },
+    { id: "602", name: "Valle Viejo", provinceId: "6" },
+    // Chaco
+    { id: "701", name: "Resistencia", provinceId: "7" },
+    { id: "702", name: "Charata", provinceId: "7" },
+    // Chubut
+    { id: "801", name: "Rawson", provinceId: "8" },
+    { id: "802", name: "Comodoro Rivadavia", provinceId: "8" },
+    { id: "803", name: "Puerto Madryn", provinceId: "8" },
+    // Corrientes
+    { id: "901", name: "Corrientes Capital", provinceId: "9" },
+    { id: "902", name: "Goya", provinceId: "9" },
+    { id: "903", name: "Concepción", provinceId: "9" },
+    // Entre Ríos
+    { id: "1001", name: "Paraná", provinceId: "10" },
+    { id: "1002", name: "Concordia", provinceId: "10" },
+    { id: "1003", name: "Gualeguaychú", provinceId: "10" },
+    // Formosa
+    { id: "1101", name: "Formosa Capital", provinceId: "11" },
+    { id: "1102", name: "Clorinda", provinceId: "11" },
+    // Jujuy
+    { id: "1201", name: "San Salvador de Jujuy", provinceId: "12" },
+    { id: "1202", name: "Palpalá", provinceId: "12" },
+    // La Pampa
+    { id: "1301", name: "Santa Rosa", provinceId: "13" },
+    { id: "1302", name: "General Pico", provinceId: "13" },
+    // La Rioja
+    { id: "1401", name: "La Rioja Capital", provinceId: "14" },
+    { id: "1402", name: "Chilecito", provinceId: "14" },
+    // Misiones
+    { id: "1501", name: "Posadas", provinceId: "15" },
+    { id: "1502", name: "Puerto Iguazú", provinceId: "15" },
+    { id: "1503", name: "Eldorado", provinceId: "15" },
+    // Neuquén
+    { id: "1601", name: "Neuquén Capital", provinceId: "16" },
+    { id: "1602", name: "Cipolletti", provinceId: "16" },
+    // Río Negro
+    { id: "1701", name: "Viedma", provinceId: "17" },
+    { id: "1702", name: "Bariloche", provinceId: "17" },
+    { id: "1703", name: "San Carlos de Bariloche", provinceId: "17" },
+    // Salta
+    { id: "1801", name: "Salta Capital", provinceId: "18" },
+    { id: "1802", name: "Orán", provinceId: "18" },
+    // San Juan
+    { id: "1901", name: "San Juan Capital", provinceId: "19" },
+    { id: "1902", name: "Calingasta", provinceId: "19" },
+    // San Luis
+    { id: "2001", name: "San Luis Capital", provinceId: "20" },
+    { id: "2002", name: "Villa Mercedes", provinceId: "20" },
+    // Santa Cruz
+    { id: "2101", name: "Río Gallegos", provinceId: "21" },
+    { id: "2102", name: "Caleta Olivia", provinceId: "21" },
+    // Santiago del Estero
+    { id: "2201", name: "Santiago del Estero Capital", provinceId: "22" },
+    { id: "2202", name: "La Banda", provinceId: "22" },
+    // Tierra del Fuego
+    { id: "2301", name: "Ushuaia", provinceId: "23" },
+    { id: "2302", name: "Río Grande", provinceId: "23" },
+    // Ciudad Autónoma de Buenos Aires
+    { id: "2401", name: "Comuna 1", provinceId: "24" },
+    { id: "2402", name: "Comuna 2", provinceId: "24" },
+    { id: "2403", name: "Comuna 3", provinceId: "24" },
+    { id: "2404", name: "Comuna 4", provinceId: "24" },
+    { id: "2405", name: "Comuna 5", provinceId: "24" },
+    { id: "2406", name: "Comuna 6", provinceId: "24" },
+    { id: "2407", name: "Comuna 7", provinceId: "24" },
+    { id: "2408", name: "Comuna 8", provinceId: "24" },
+    { id: "2409", name: "Comuna 9", provinceId: "24" },
+    { id: "2410", name: "Comuna 10", provinceId: "24" },
+    { id: "2411", name: "Comuna 11", provinceId: "24" },
+    { id: "2412", name: "Comuna 12", provinceId: "24" },
+    { id: "2413", name: "Comuna 13", provinceId: "24" },
+    { id: "2414", name: "Comuna 14", provinceId: "24" },
+    { id: "2415", name: "Comuna 15", provinceId: "24" },
   ])
-  const [filteredMunicipalities, setFilteredMunicipalities] = useState([])
+  const [filteredMunicipalities, setFilteredMunicipalities] = useState<typeof municipalities>([])
   const [isSavingAddress, setIsSavingAddress] = useState(false)
   const [selectedAddressDetails, setSelectedAddressDetails] = useState<Address | null>(null)
   const [orderCompleted, setOrderCompleted] = useState(false)
@@ -163,16 +260,49 @@ export default function CheckoutPage() {
     }, 0)
   }, [items])
 
+  // Calcular el total en ARS para determinar qué cuenta bancaria mostrar
+  // totalPrice siempre está en USD (los productos tienen precio en USD)
+  // Multiplicamos por exchangeRate para obtener el valor en ARS
+  const totalInARS = useMemo(() => {
+    return totalPrice * exchangeRate
+  }, [totalPrice, exchangeRate])
+
+  // Umbral: 100.000 ARS para usar Santander
+  const HIGH_VALUE_THRESHOLD_ARS = 100000
+  const isHighValueOrder = totalInARS >= HIGH_VALUE_THRESHOLD_ARS
+
+  // Datos de cuentas bancarias
+  const bankAccounts = {
+    astropay: {
+      banco: "Astropay",
+      titular: "Liliana Solange de Sousa Bueno",
+      cbu: "0000184305010018145722",
+      alias: "324..alta",
+      recargo: "2.5% de recargo",
+    },
+    santander: {
+      banco: "Santander",
+      titular: "Liliana Solange de Sousa Bueno",
+      cbu: "0720181988000006590286",
+      alias: "Alta794..",
+      recargo: "2.5% de recargo",
+    },
+  }
+
+  const selectedBankAccount = isHighValueOrder ? bankAccounts.santander : bankAccounts.astropay
+
   const paymentMethods: PaymentMethod[] = [
     {
       id: "transfer",
       name: "Transferencia Bancaria",
-      description: "Realiza una transferencia a nuestra cuenta bancaria",
+      description: isHighValueOrder 
+        ? "Compra mayor a $100.000 ARS - Usar cuenta Santander" 
+        : "Realiza una transferencia a nuestra cuenta bancaria",
       icon: <CreditCard className="h-5 w-5" />,
       requiresProof: true,
-      instructions: "Realiza la transferencia a la cuenta bancaria indicada y sube el comprobante.",
+      instructions: `Realiza la transferencia a la cuenta bancaria indicada y sube el comprobante. ${selectedBankAccount.recargo}`,
       accountDetails:
-        "Banco: Personal Pay\nTitular: Liliana De Sousa Bueno\nCuenta: Digital\nCBU: 0000076500000028217943\nAlias: Alta.324\nCUIT: 23306387944",
+        `Banco: ${selectedBankAccount.banco}\nTitular: ${selectedBankAccount.titular}\nCBU: ${selectedBankAccount.cbu}\nAlias: ${selectedBankAccount.alias}\n${selectedBankAccount.recargo}`,
     },
     {
       id: "usdt",
@@ -182,6 +312,14 @@ export default function CheckoutPage() {
       requiresProof: false,
       instructions: "Envía USDT a la dirección proporcionada y comparte el hash de la transacción.",
       accountDetails: "Dirección USDT (TRC20): TEK3ZHbDGpAMCB1Tnp6jL5kqZVCmG16rci",
+    },
+    {
+      id: "cash",
+      name: "Efectivo",
+      description: "Paga en efectivo al retirar en el local o al recibir tu pedido",
+      icon: <Wallet className="h-5 w-5" />,
+      requiresProof: false,
+      instructions: "Pagarás en efectivo en el momento de la entrega o retiro. No es necesario subir comprobantes.",
     },
     {
       id: "cod",
@@ -206,22 +344,21 @@ export default function CheckoutPage() {
 
     const fetchAddresses = async () => {
       try {
-        const addressesRef = collection(db, "addresses")
-        const q = query(addressesRef, where("userId", "==", user.uid))
-        const querySnapshot = await getDocs(q)
+        const res = await fetch(`/api/addresses?userId=${user.uid}`)
+        if (!res.ok) throw new Error('Failed to fetch addresses')
+        const data = await res.json()
 
         const addressesData: Address[] = []
-        querySnapshot.forEach((doc) => {
-          const data = doc.data()
+        ;(data || []).forEach((addrData: any) => {
           addressesData.push({
-            id: doc.id,
-            name: data.name || "",
-            street: `${data.street} ${data.number}${data.floor ? `, Piso ${data.floor}` : ""}${data.apartment ? `, Depto ${data.apartment}` : ""}`,
-            city: data.municipality || "",
-            state: data.province || "",
-            zipCode: data.postalCode || "",
-            country: data.country || "Argentina",
-            isDefault: data.isDefault || false,
+            id: addrData.id || addrData._id,
+            name: addrData.name || "",
+            street: `${addrData.street || ''} ${addrData.number || ''}${addrData.floor ? `, Piso ${addrData.floor}` : ""}${addrData.apartment ? `, Depto ${addrData.apartment}` : ""}`,
+            city: addrData.municipality || "",
+            state: addrData.province || "",
+            zipCode: addrData.postalCode || "",
+            country: addrData.country || "Argentina",
+            isDefault: addrData.isDefault || false,
           })
         })
 
@@ -279,7 +416,7 @@ export default function CheckoutPage() {
 
   const validateCheckout = () => {
     const issues: string[] = []
-    if (!selectedAddressId) issues.push('Seleccioná una dirección de envío')
+    if (!pickupInStore && !selectedAddressId) issues.push('Seleccioná una dirección de envío')
     if (!selectedPaymentMethod) issues.push('Seleccioná un método de pago')
     if (!recipientInfo.name) issues.push('Ingresá el nombre del destinatario')
     if (!recipientInfo.documentId) issues.push('Ingresá el documento del destinatario')
@@ -313,7 +450,7 @@ export default function CheckoutPage() {
     }
   }, [addressFormData.province, municipalities])
 
-  const handleAddressFormChange = (field, value) => {
+  const handleAddressFormChange = (field: string, value: string | boolean) => {
     setAddressFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -359,30 +496,11 @@ export default function CheckoutPage() {
         return
       }
 
-      // Si es dirección predeterminada, actualizar las demás
-      if (addressFormData.isDefault) {
-        const addressesRef = collection(db, "addresses")
-        const q = query(addressesRef, where("userId", "==", user.uid), where("isDefault", "==", true))
-        const querySnapshot = await getDocs(q)
-
-        // Actualizar todas las direcciones predeterminadas existentes
-        const batch = []
-        querySnapshot.forEach((document) => {
-          batch.push(
-            updateDoc(doc(db, "addresses", document.id), {
-              isDefault: false,
-            }),
-          )
-        })
-
-        await Promise.all(batch)
-      }
-
       // Obtener nombre de provincia y municipio
       const provinceName = provinces.find((p) => p.id === addressFormData.province)?.name || ""
       const municipalityName = municipalities.find((m) => m.id === addressFormData.municipality)?.name || ""
 
-      // Guardar nueva dirección
+      // Guardar nueva dirección via API
       const addressData = {
         userId: user.uid,
         name: addressFormData.name,
@@ -397,15 +515,19 @@ export default function CheckoutPage() {
         municipalityId: addressFormData.municipality,
         country: addressFormData.country,
         isDefault: addressFormData.isDefault,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
       }
 
-      const docRef = await addDoc(collection(db, "addresses"), addressData)
+      const res = await fetch('/api/addresses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addressData),
+      })
+      if (!res.ok) throw new Error('Failed to save address')
+      const savedAddress = await res.json()
 
       // Crear objeto de dirección para la UI
       const newAddress = {
-        id: docRef.id,
+        id: savedAddress.id || savedAddress._id,
         name: addressFormData.name,
         street: `${addressFormData.street} ${addressFormData.number}${addressFormData.floor ? `, Piso ${addressFormData.floor}` : ""}${addressFormData.apartment ? `, Depto ${addressFormData.apartment}` : ""}`,
         city: municipalityName,
@@ -419,7 +541,7 @@ export default function CheckoutPage() {
       setAddresses((prev) => [...prev, newAddress])
 
       // Seleccionar la nueva dirección
-      setSelectedAddressId(docRef.id)
+      setSelectedAddressId(savedAddress.id || savedAddress._id)
       setSelectedAddressDetails(newAddress)
 
       // Resetear formulario y cerrar diálogo
@@ -473,18 +595,23 @@ export default function CheckoutPage() {
 
     try {
       setLoadingUserProfile(true)
-      const userDocRef = doc(db, "userProfiles", user.uid)
-      const userDoc = await getDoc(userDocRef)
-
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        setRecipientInfo({
-          name: userData.displayName || user.displayName || "",
-          documentId: userData.documentId || "",
-          phone: userData.phoneNumber || user.phoneNumber || "",
-        })
+      const res = await fetch(`/api/user-profiles?uid=${user.uid}`)
+      if (res.ok) {
+        const userData = await res.json()
+        if (userData) {
+          setRecipientInfo({
+            name: userData.displayName || user.displayName || "",
+            documentId: userData.documentId || "",
+            phone: userData.phoneNumber || user.phoneNumber || "",
+          })
+        } else {
+          setRecipientInfo({
+            name: user.displayName || "",
+            documentId: "",
+            phone: user.phoneNumber || "",
+          })
+        }
       } else {
-        // Si no hay perfil, usar datos básicos del auth
         setRecipientInfo({
           name: user.displayName || "",
           documentId: "",
@@ -508,12 +635,11 @@ export default function CheckoutPage() {
 
   const copyPaymentData = () => {
     if (selectedMethod?.id === "transfer") {
-      // Copiar CBU para transferencia bancaria
-      const cbu = "0000076500000028217943"
-      navigator.clipboard.writeText(cbu)
+      // Copiar CBU para transferencia bancaria (según monto)
+      navigator.clipboard.writeText(selectedBankAccount.cbu)
       toast({
         title: "CBU copiado",
-        description: "El CBU ha sido copiado al portapapeles",
+        description: `CBU de ${selectedBankAccount.banco} copiado al portapapeles`,
       })
     } else if (selectedMethod?.id === "usdt") {
       // Copiar dirección de wallet USDT
@@ -539,28 +665,17 @@ export default function CheckoutPage() {
     try {
       setIsUpdatingProfile(true)
 
-      const userDocRef = doc(db, "userProfiles", user.uid)
-      const userDoc = await getDoc(userDocRef)
-
-      if (userDoc.exists()) {
-        // Actualizar documento existente
-        await updateDoc(userDocRef, {
-          displayName: recipientInfo.name,
-          documentId: recipientInfo.documentId,
-          phoneNumber: recipientInfo.phone,
-          updatedAt: Timestamp.now(),
-        })
-      } else {
-        // Crear nuevo documento
-        await setDoc(userDocRef, {
+      await fetch('/api/user-profiles', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: user.uid,
           displayName: recipientInfo.name,
           documentId: recipientInfo.documentId,
           phoneNumber: recipientInfo.phone,
           email: user.email,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        })
-      }
+        }),
+      })
 
       toast({
         title: "Perfil actualizado",
@@ -588,7 +703,7 @@ export default function CheckoutPage() {
       return
     }
 
-    if (!selectedAddressId || !selectedAddressDetails) {
+    if (!pickupInStore && (!selectedAddressId || !selectedAddressDetails)) {
       toast({
         title: "Error",
         description: "Selecciona una dirección de envío",
@@ -629,89 +744,143 @@ export default function CheckoutPage() {
     try {
       setIsSubmitting(true)
 
-      // Crear objeto de orden con información completa
-      const orderData = {
-        userId: user.uid,
-        userEmail: user.email,
-        items: items.map((item) => ({
-          productId: item.product.id,
-          name: item.product.name,
-          price: item.product.price,
-          quantity: item.quantity,
-          subtotal: item.product.price * item.quantity,
-          image:
-            item.product.image1 ||
-            (item.product.images && item.product.images.length > 0 ? item.product.images[0] : null),
-        })),
-        // Guardar ID y detalles completos de la dirección
-        addressId: selectedAddressId,
-        shippingAddress: {
-          id: selectedAddressDetails.id,
-          name: selectedAddressDetails.name,
-          street: selectedAddressDetails.street,
-          city: selectedAddressDetails.city,
-          state: selectedAddressDetails.state,
-          zipCode: selectedAddressDetails.zipCode,
-          country: selectedAddressDetails.country,
-        },
-        // Información del destinatario
-        recipientInfo: {
-          name: recipientInfo.name,
-          documentId: recipientInfo.documentId,
-          phone: recipientInfo.phone,
-        },
-        // Información para el panel de administración
-        customer: recipientInfo.name, // Para compatibilidad con la vista de admin
-        email: user.email,
-        paymentMethod: selectedPaymentMethod,
-        paymentMethodName: paymentMethods.find((m) => m.id === selectedPaymentMethod)?.name || selectedPaymentMethod,
-        totalAmount: totalPrice,
-        subtotal: totalPrice,
-        shippingCost: 0, // Envío gratis
-        taxAmount: 0, // Sin impuestos adicionales
-        status: selectedPaymentMethod === "cod" ? "pending" : "processing",
-        paymentStatus: selectedPaymentMethod === "cod" ? "pending" : "pending_verification",
-        notes: notes,
-        date: new Date().toISOString().split("T")[0], // Para compatibilidad con la vista de admin
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-        total: totalPrice, // Campo adicional para compatibilidad con la interfaz Order
+      // Crear venta en Mongo (colección "sales") para integrarla con caja/POS
+      // Esta será la única transacción registrada para evitar doble cargo
+      let saleId: string | undefined
+      let orderId: string | undefined
+      
+      try {
+        const now = new Date()
+        const baseCurrency = "USD"
+        const saleData = {
+          saleNumber: `WEB-${now.getTime()}`,
+          date: now.toLocaleDateString("es-AR"),
+          time: now.toLocaleTimeString("es-AR"),
+          items: items.map((item) => ({
+            name: item.product.name,
+            quantity: item.quantity,
+            price: item.product.price,
+            subtotal: item.product.price * item.quantity,
+          })),
+          subtotal: totalPrice,
+          total: totalPrice,
+          currency: baseCurrency,
+          paymentMethod: selectedPaymentMethod,
+          status: "pending",
+          // Información adicional para display en ARS/USD
+          displayCurrency: currency,
+          exchangeRate: currency === "ARS" ? exchangeRate : 1,
+          displayTotal: currency === "ARS" ? totalPrice * exchangeRate : totalPrice,
+          customerName: recipientInfo.name,
+          customerPhone: recipientInfo.phone,
+          // Información de envío
+          shippingAddress: pickupInStore
+            ? {
+                id: "pickup",
+                name: "Retiro en el local",
+                street: "Retiro en el local (sin envío)",
+                city: "",
+                state: "",
+                zipCode: "",
+                country: "Argentina",
+              }
+            : {
+                id: selectedAddressDetails?.id ?? "",
+                name: selectedAddressDetails?.name ?? "",
+                street: selectedAddressDetails?.street ?? "",
+                city: selectedAddressDetails?.city ?? "",
+                state: selectedAddressDetails?.state ?? "",
+                zipCode: selectedAddressDetails?.zipCode ?? "",
+                country: selectedAddressDetails?.country ?? "Argentina",
+              },
+          recipientInfo: {
+            name: recipientInfo.name,
+            documentId: recipientInfo.documentId,
+            phone: recipientInfo.phone,
+          },
+          notes: notes,
+          isWebOrder: true,
+        }
+
+        const saleRes = await fetch("/api/sales", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(saleData),
+        })
+
+        if (saleRes.ok) {
+          const created = await saleRes.json()
+          saleId = String(created.id || created._id || "") || undefined
+          console.log('[Checkout] Venta creada exitosamente:', saleId)
+        } else {
+          try {
+            console.error("Error al crear venta en Mongo:", await saleRes.text())
+          } catch {
+            console.error("Error al crear venta en Mongo (sin texto de respuesta)")
+          }
+        }
+      } catch (err) {
+        console.error("Error al crear venta en Mongo:", err)
       }
 
-      // Añadir detalles específicos según método de pago
-      if (selectedPaymentMethod === "transfer") {
-        orderData.transferDetails = transferDetails
-        // Aquí se manejaría la subida del comprobante a Firebase Storage
-      } else if (selectedPaymentMethod === "usdt") {
-        orderData.transactionHash = transactionHash
-      }
+      // Crear orden simplificada que referencia a la venta
+      // Solo para seguimiento del cliente, sin duplicar montos
+      if (saleId) {
+        try {
+          const orderData = {
+            userId: user.uid,
+            userEmail: user.email,
+            customer: recipientInfo.name,
+            email: user.email,
+            phone: recipientInfo.phone,
+            status: selectedPaymentMethod === "cod" || selectedPaymentMethod === "cash" ? "pending" : "processing",
+            paymentStatus: selectedPaymentMethod === "cod" || selectedPaymentMethod === "cash" ? "pending" : "pending_verification",
+            paymentMethod: selectedPaymentMethod,
+            paymentMethodName: paymentMethods.find((m) => m.id === selectedPaymentMethod)?.name || selectedPaymentMethod,
+            saleId: saleId, // Referencia a la venta única
+            items: [], // No duplicar items aquí, están en la venta
+            subtotal: 0, // No duplicar montos
+            shipping: 0,
+            total: 0, // Monto real está en la venta referenciada
+            shippingAddress: pickupInStore ? "Retiro en local" : selectedAddressDetails?.street || "",
+            notes: notes,
+            date: new Date().toISOString().split("T")[0],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
 
-      // Guardar orden en Firestore
-      const orderRef = await addDoc(collection(db, "orders"), orderData)
+          const orderRes = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderData),
+          })
+
+          if (orderRes.ok) {
+            const savedOrder = await orderRes.json()
+            orderId = savedOrder.id || savedOrder._id
+            console.log('[Checkout] Orden de seguimiento creada:', orderId)
+          } else {
+            console.error("Error al crear orden de seguimiento:", await orderRes.text())
+          }
+        } catch (err) {
+          console.error("Error al crear orden de seguimiento:", err)
+        }
+      }
 
       // Actualizar perfil si está marcada la opción
       if (saveProfileChanges) {
         try {
-          const userDocRef = doc(db, "userProfiles", user.uid)
-          const userDoc = await getDoc(userDocRef)
-
-          if (userDoc.exists()) {
-            await updateDoc(userDocRef, {
-              displayName: recipientInfo.name,
-              documentId: recipientInfo.documentId,
-              phoneNumber: recipientInfo.phone,
-              updatedAt: Timestamp.now(),
-            })
-          } else {
-            await setDoc(userDocRef, {
+          await fetch('/api/user-profiles', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              uid: user.uid,
               displayName: recipientInfo.name,
               documentId: recipientInfo.documentId,
               phoneNumber: recipientInfo.phone,
               email: user.email,
-              createdAt: Timestamp.now(),
-              updatedAt: Timestamp.now(),
-            })
-          }
+            }),
+          })
         } catch (error) {
           console.error("Error al actualizar perfil durante checkout:", error)
           // No interrumpimos el flujo de checkout si falla la actualización del perfil
@@ -727,12 +896,14 @@ export default function CheckoutPage() {
       // Mostrar confirmación
       toast({
         title: "¡Pedido realizado!",
-        description: `Tu pedido #${orderRef.id.substring(0, 8)} ha sido registrado correctamente.`,
+        description: `Tu pedido #${String(orderId || saleId || 'unknown').substring(0, 8)} ha sido registrado correctamente.`,
       })
 
       // Redirigir a página de confirmación de pedido
       setTimeout(() => {
-        router.push(`/order-confirmation/${orderRef.id}`)
+        // Usar orderId si existe, si no usar saleId para confirmación
+        const confirmationId = orderId || saleId || 'unknown'
+        router.push(`/order-confirmation/${confirmationId}`)
       }, 500)
     } catch (error) {
       console.error("Error al procesar el pedido:", error)
@@ -749,7 +920,8 @@ export default function CheckoutPage() {
   const selectedMethod = paymentMethods.find((method) => method.id === selectedPaymentMethod)
 
   return (
-    <div className="container px-4 py-8 md:px-6 md:py-12 max-w-7xl mx-auto">
+    <div className="w-full overflow-x-hidden">
+      <div className="container px-4 py-8 md:px-6 md:py-12 max-w-7xl mx-auto">
       <div className="mb-8 flex flex-col sm:flex-row sm:items-center">
         <Button
           variant="ghost"
@@ -960,7 +1132,34 @@ export default function CheckoutPage() {
                 </Dialog>
               </div>
 
-              {loadingAddresses ? (
+              <div
+                className={`mb-4 rounded-lg border-2 p-4 flex items-start gap-3 cursor-pointer transition-colors ${
+                  pickupInStore
+                    ? "border-red-500 bg-red-50 dark:bg-red-950/30"
+                    : "border-dashed border-gray-300 dark:border-gray-700 hover:border-red-400 hover:bg-red-50/40"
+                }`}
+              >
+                <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300">
+                  <MapPin className="h-4 w-4" />
+                </div>
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="pickupInStore"
+                      checked={pickupInStore}
+                      onCheckedChange={(checked) => setPickupInStore(checked === true)}
+                    />
+                    <Label htmlFor="pickupInStore" className="text-sm font-medium cursor-pointer">
+                      Retiro en el local (sin envío a domicilio)
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Retirarás tu compra en el local. No es necesario cargar una dirección de envío.
+                  </p>
+                </div>
+              </div>
+
+              {pickupInStore ? null : loadingAddresses ? (
                 <div className="space-y-4">
                   <Skeleton className="h-20 w-full" />
                   <Skeleton className="h-20 w-full" />
@@ -1239,7 +1438,7 @@ export default function CheckoutPage() {
                       <div className="h-16 w-16 overflow-hidden rounded-md border group-hover:border-red-300 transition-colors">
                         <img
                           src={
-                            item.product.image1 ||
+                            (item.product as any).image1 ||
                             (item.product.images && item.product.images.length > 0
                               ? item.product.images[0]
                               : `/placeholder.svg?height=64&width=64`)
@@ -1254,7 +1453,7 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                     <p className="font-medium">
-                      {(item.product.price * item.quantity).toFixed(2)} {item.product.currency}
+                      {(item.product.price * item.quantity).toFixed(2)} {(item.product as any).currency || 'USD'}
                     </p>
                   </div>
                 ))}
@@ -1304,7 +1503,7 @@ export default function CheckoutPage() {
             </CardContent>
             <CardFooter className="flex flex-col space-y-4">
               {(!recipientInfo.name || !recipientInfo.documentId || !recipientInfo.phone) && (
-                <Alert variant="warning" className="mb-2">
+                <Alert variant="default" className="mb-2 border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950/20">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>Información incompleta</AlertTitle>
                   <AlertDescription>
@@ -1357,6 +1556,7 @@ export default function CheckoutPage() {
             </CardFooter>
           </Card>
         </div>
+      </div>
       </div>
     </div>
   )
